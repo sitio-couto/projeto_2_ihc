@@ -20,7 +20,7 @@ const int blue_pin = D7;
 const int trig_pin = D1;
 const int echo_pin = D0;
 const int buzzer = D3;
-const int max_dist = 40;
+const int max_dist = 150;
 boolean pessoa = false;
 int distancias[10];
 int i = -1;
