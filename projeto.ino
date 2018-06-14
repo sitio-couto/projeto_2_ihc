@@ -4,175 +4,161 @@
 #include <MQTTClient.h>
 
 const char client_id[] = "microcontrolador";     //arbitrary identification
-const char client_key[] = "a0160aee";                   //token KEY from shiftr.io
-const char client_secret[] = "eb90656ac81576b0";                //token SECRET from shiftr.io
+const char client_key[] = "a0160aee";            //token KEY from shiftr.io
+const char client_secret[] = "eb90656ac81576b0"; //token SECRET from shiftr.io
 
-const char ssid[] = "11111";     //name of the used Wi-Fi network
-const char pass[] = "21111";     //password of the Wi-Fi network
+const char ssid[] = "11111"; //name of the used Wi-Fi network
+const char pass[] = "21111"; //password of the Wi-Fi network
 
 WiFiClient net;
 MQTTClient client;
 const int QoS = 1;
 
-const int red_pin = D5;
-const int green_pin = D6;
-const int blue_pin = D7;
-const int trig_pin = D1;
-const int echo_pin = D0;
-const int buzzer = D3;
-const int max_dist = 150;
-boolean pessoa = false;
-int distancias[10];
-int i = -1;
+// sets up the pin assignments
+const int red_pin    = D5;
+const int green_pin  = D6;
+const int blue_pin   = D7;
+const int buzzer_pin = D3;
+const int trig_pin   = D1;
+const int echo_pin   = D0;
+const int max_dist   = 150;
 
-int red = 255;
+// stores the last MAX_STORED_DISTANCES distances
+const int MAX_STORED_DISTANCES = 10;
+int distances[MAX_STORED_DISTANCES];
+int stored_distances = 0;
+
+// starts with a red LED
+int red   = 255;
 int green = 0;
-int blue = 0;
+int blue  = 0;
 
-// defines variables
-long duration;
 int distance;
-//boolean person = false;
+boolean has_observers = false;
+boolean is_buzzing = false;
+const int MAX_LOOPS_BUZZING = 1000;
+int loops_buzzing = 0;
 
 void setup() {
-  // put your setup code here, to run once:
     Serial.begin(115200);
 
-    pinMode(red_pin, OUTPUT);
-    pinMode(green_pin, OUTPUT);
-    pinMode(blue_pin, OUTPUT);
-  	pinMode(trig_pin, OUTPUT); // Sets the trig_pin as an Output
-	pinMode(echo_pin, INPUT); // Sets the echo_pin as an Input
-	pinMode(buzzer, OUTPUT); // Set buzzer as an output
+    pinMode(red_pin,    OUTPUT);
+    pinMode(green_pin,  OUTPUT);
+    pinMode(blue_pin,   OUTPUT);
+    pinMode(buzzer_pin, OUTPUT);
+    pinMode(trig_pin,   OUTPUT);
+    pinMode(echo_pin,   INPUT);
 
-
-    //connectWIFI();
+    /*
+    connectWIFI();
     client.begin("broker.shiftr.io", net);
-    //client.onMessage(messageReceived);
-    //connectMQTT();
+    client.onMessage(messageReceived);
+    connectMQTT();
 
     client.subscribe("/red");
     client.subscribe("/green");
     client.subscribe("/blue");
+    */
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
+    if (is_buzzing) {
+        if (++loops_buzzing >= MAX_LOOPS_BUZZING) {
+            digitalWrite(buzzer_pin, LOW);
+            is_buzzing = false;
+            loops_buzzing = 0;
+        }
+    }
 
-  // Clears the trig_pin
-	digitalWrite(trig_pin, LOW);
-	delayMicroseconds(2);
-	// Sets the trig_pin on HIGH state for 10 micro seconds
-	digitalWrite(trig_pin, HIGH);
-	delayMicroseconds(10);
-	digitalWrite(trig_pin, LOW);
-	// Reads the echo_pin, returns the sound wave travel time in microseconds
-	duration = pulseIn(echo_pin, HIGH);
-	// Calculating the distance
-	distance= duration*0.034/2;
-	// Prints the distance on the Serial Monitor
-	Serial.print("Distance: ");
-	Serial.println(distance);
+    // clears the trig_pin
+    digitalWrite(trig_pin, LOW);
+    delayMicroseconds(2);
+    // sets the trig_pin on HIGH state for 10 micro seconds
+    digitalWrite(trig_pin, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(trig_pin, LOW);
+    // reads the echo_pin and returns the sound wave travel time in microseconds
+    int distance = pulseIn(echo_pin, HIGH)*0.034/2;
 
-	if(i < 9){
-		i++;
-		distancias[i] = distance;
-	} else {
-		for(int j = 0; j < 9; j++){
-			distancias[j] = distancias[j+1];
-		}
-		distancias[9] = distance;
-	}
+    Serial.print("Distance: ");
+    Serial.println(distance);
 
-	int mediana = medf(distancias, i+1);
+    if (stored_distances < MAX_STORED_DISTANCES) {
+        distances[stored_distances++] = distance;
+    } else {
+        for (int i = 0; i < stored_distances - 1; ++i) distances[i] = distances[i+1];
+        distances[stored_distances - 1] = distance;
+    }
 
-	Serial.print("MEDIANA: ");
-	Serial.println(mediana);
+    // calculates the median of the last stored distances
+    int median = median(distances, stored_distances);
 
-	if(mediana > max_dist){
-		//if(pessoa){
-		//	pessoa = false;
-		//	tone(buzzer, 100, 1000); // Send 1KHz sound signal for 1 sec
-		//}
-		red = 255;
-		green = 0;
-	} else{
-		//pessoa = true;
-		red = 0;
-		green = 255;
-	}
+    Serial.print("Median: ");
+    Serial.println(median);
 
-	setColor(red, green, blue);
+    if (median > max_dist) {
+        if (has_observers) {
+            has_observers = false;
+            digitalWrite(buzzer_pin, HIGH);
+            is_buzzing = true;
+            loops_buzzing = 1;
+        }
+        red   = 255;
+        green = 0;
+    } else {
+        has_observers = true;
+        red   = 0;
+        green = 255;
+    }
+
+    setColor(red, green, blue);
 }
 
-void connectWIFI()
-{
+// note that v_size should be less or equal to MAX_STORED_DISTANCES
+int median(int *v, int v_size) {
+    int vec[MAX_STORED_DISTANCES];
+    int i = 0;
+    for (; i < MAX_STORED_DISTANCES; ++i) vec[c] = v[c];
+    for (i = 0; i < v_size; ++i) {
+        for (j = i-1; (j >= 0) && (vec[j] > vec[i]); --j) {
+            vec[j+1] = vec[j];
+        }
+        vec[j+1] = vec[i];
+    }
+    return vec[v_size/2];
+}
+
+void connectWIFI() {
     Serial.print("Connecting Wi-Fi: ");
     WiFi.begin(ssid, pass);
-    while (WiFi.status() != WL_CONNECTED)
-    {
+    while (WiFi.status() != WL_CONNECTED) {
         delay(500);
         Serial.print(".");
     }
     Serial.println(" Wi-Fi connected!");
 }
 
-void connectMQTT()
-{
+void connectMQTT() {
     Serial.print("Connecting MQTT: ");
-    while (!client.connect(client_id, client_key, client_secret))
-    {
+    while (!client.connect(client_id, client_key, client_secret)) {
         delay(500);
         Serial.print(".");
     }
     Serial.println(" MQTT connected!");
 }
 
-void messageReceived(String &topic, String &payload)
-{
+void messageReceived(String &topic, String &payload) {
     Serial.println("New message: " + topic + " - " + payload);
-
-    if (topic == "/red")
-    {
-        red = payload.toInt();
-    }
-
-    if (topic == "/green")
-    {
-        green = payload.toInt();
-    }
-
-    if (topic == "/blue")
-    {
-        blue = payload.toInt();
-    }
+    if (topic == "/red")   red   = payload.toInt();
+    if (topic == "/green") green = payload.toInt();
+    if (topic == "/blue")  blue  = payload.toInt();
 }
 
-void setColor(int r, int g, int b)
-{
+void setColor(int r, int g, int b) {
     r = map(r, 0, 255, 0, 1023);
     g = map(g, 0, 255, 0, 1023);
     b = map(b, 0, 255, 0, 1023);
-    analogWrite(red_pin, r);
+    analogWrite(red_pin,   r);
     analogWrite(green_pin, g);
-    analogWrite(blue_pin, b);
-}
-
-int medf(int *b, int n)
-{
-	int a[10];
-	for(int c = 0; c < 10; c++){
-		a[c] = b[c];
-	}
- for (int d = 1; d < n; ++d)
- {
-   int j = a[d];
-   int k;
-   for (k = d - 1; (k >= 0) && (j < a[k]); k--)
-   {
-     a[k + 1] = a[k];
-   }
-   a[k + 1] = j;
- }
- return a[5];
+    analogWrite(blue_pin,  b);
 }
