@@ -21,6 +21,9 @@ const int trig_pin = D1;
 const int echo_pin = D0;
 const int buzzer = D3;
 const int max_dist = 40;
+boolean pessoa = false;
+int distancias[10];
+int i = -1;
 
 int red = 255;
 int green = 0;
@@ -29,7 +32,7 @@ int blue = 0;
 // defines variables
 long duration;
 int distance;
-boolean person = false;
+//boolean person = false;
 
 void setup() {
   // put your setup code here, to run once:
@@ -71,22 +74,35 @@ void loop() {
 	Serial.print("Distance: ");
 	Serial.println(distance);
 
-	if(distance > max_dist){
+	if(i < 9){
+		i++;
+		distancias[i] = distance;
+	} else {
+		for(int j = 0; j < 9; j++){
+			distancias[j] = distancias[j+1];
+		}
+		distancias[9] = distance;
+	}
+
+	int mediana = medf(distancias, i+1);
+
+	Serial.print("MEDIANA: ");
+	Serial.println(mediana);
+
+	if(mediana > max_dist){
+		//if(pessoa){
+		//	pessoa = false;
+		//	tone(buzzer, 100, 1000); // Send 1KHz sound signal for 1 sec
+		//}
 		red = 255;
 		green = 0;
 	} else{
+		//pessoa = true;
 		red = 0;
 		green = 255;
 	}
 
 	setColor(red, green, blue);
-
-	//if(distance > max_dist){
-	//	tone(buzzer, 1000); // Send 1KHz sound signal...
-  		//delay(1000);        // ...for 1 sec
-	//} else{
-	//	noTone(buzzer);     // Stop sound...
-	//}
 }
 
 void connectWIFI()
@@ -140,4 +156,23 @@ void setColor(int r, int g, int b)
     analogWrite(red_pin, r);
     analogWrite(green_pin, g);
     analogWrite(blue_pin, b);
+}
+
+int medf(int *b, int n)
+{
+	int a[10];
+	for(int c = 0; c < 10; c++){
+		a[c] = b[c];
+	}
+ for (int d = 1; d < n; ++d)
+ {
+   int j = a[d];
+   int k;
+   for (k = d - 1; (k >= 0) && (j < a[k]); k--)
+   {
+     a[k + 1] = a[k];
+   }
+   a[k + 1] = j;
+ }
+ return a[5];
 }
