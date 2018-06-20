@@ -15,6 +15,7 @@ MQTTClient client;
 const int QoS = 1;
 
 // sets up the pin assignments
+const int obs_pin    = D9; // watched by the raspberry pi to know if there's an observer
 const int red_pin    = D5;
 const int green_pin  = D6;
 const int blue_pin   = D7;
@@ -42,6 +43,7 @@ int loops_buzzing = 0;
 void setup() {
     Serial.begin(115200);
 
+    pinMode(obs_pin,    OUTPUT);
     pinMode(red_pin,    OUTPUT);
     pinMode(green_pin,  OUTPUT);
     pinMode(blue_pin,   OUTPUT);
@@ -112,6 +114,12 @@ void loop() {
     }
 
     setColor(red, green, blue);
+
+    if (has_observers) {
+        digitalWrite(obs_pin, HIGH);
+    } else {
+        digitalWrite(obs_pin, LOW);
+    }
 }
 
 // note that v_size should be less or equal to MAX_STORED_DISTANCES
