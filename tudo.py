@@ -4,7 +4,10 @@ from pygame import mixer
 import time
 from time import sleep
 
+test_flag = 2
 def find_faces(webcam):
+    global test_flag
+
     try:
         ret, image = webcam.read()                                      #capture from webcam
     except:
@@ -12,7 +15,9 @@ def find_faces(webcam):
         exit(0)
     grayscaled_image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)          # to greyscale
     faces = face_cascade.detectMultiScale(grayscaled_image, 1.3, 5)     # find faces in the image
-    return len(faces)                                                   # return faces quantity
+
+    if test_flag < 0: return len(faces)                                                   # return faces quantity
+    else: return test_flag
 
 def audio_speed(audio_buffer, faces_amount):
     global DELAY, buffer_speed, base_time
@@ -24,17 +29,23 @@ def audio_speed(audio_buffer, faces_amount):
         buffer_speed = 1
         mixer.music.load('deep_time.ogg')
     elif faces_amount == 2:
-        DELAY = 10
-        SCAN_FACES = 50
-        multiplier = buffer_speed/1.5
-        buffer_speed = 1.5
-        mixer.music.load('deep_time_x15.ogg')
+        DELAY = 16
+        SCAN_FACES = 10
+        multiplier = buffer_speed/1.2
+        buffer_speed = 1.2
+        mixer.music.load('deep_time_x12.ogg')
+    elif faces_amount == 3:
+        DELAY = 15
+        SCAN_FACES = 40
+        multiplier = buffer_speed/1.4
+        buffer_speed = 1.4
+        mixer.music.load('deep_time_x14.ogg')
     else:
-        DELAY = 1
-        SCAN_FACES = 200
-        multiplier = buffer_speed/2
-        buffer_speed = 2
-        mixer.music.load('deep_time_x20.ogg')
+        DELAY = 12
+        SCAN_FACES = 50
+        multiplier = buffer_speed/1.6
+        buffer_speed = 1.6
+        mixer.music.load('deep_time_x16.ogg')
 
     for time in audio_buffer: time *= multiplier
 
@@ -53,7 +64,7 @@ def rewind_video(buffer, webcam):
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)  # to greyscale
         cv2.imshow('frame',gray)                        # show the frame frame
         # if the face comes back stop rewinding
-        if (i % SCAN_FACES) == 9:
+        if (i % 10) == 9:
             t_delta = time.time()
             if find_faces(webcam) > 0:
                 return index
