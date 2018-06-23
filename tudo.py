@@ -14,6 +14,33 @@ def find_faces(webcam):
     faces = face_cascade.detectMultiScale(grayscaled_image, 1.3, 5)     # find faces in the image
     return len(faces)                                                   # return faces quantity
 
+def audio_speed(audio_buffer, faces_amount):
+    global DELAY, buffer_speed, base_time
+
+    if faces_amount == 1:
+        DELAY = 21
+        SCAN_FACES = 10
+        multiplier = buffer_speed/1
+        buffer_speed = 1
+        mixer.music.load('deep_time.ogg')
+    elif faces_amount == 2:
+        DELAY = 10
+        SCAN_FACES = 50
+        multiplier = buffer_speed/1.5
+        buffer_speed = 1.5
+        mixer.music.load('deep_time_x15.ogg')
+    else:
+        DELAY = 1
+        SCAN_FACES = 200
+        multiplier = buffer_speed/2
+        buffer_speed = 2
+        mixer.music.load('deep_time_x20.ogg')
+
+    for time in audio_buffer: time *= multiplier
+
+    base_time = (mixer.music.get_pos()/1000 + base_time)*multiplier
+
+    return base_time
 
 def rewind_video(buffer, webcam):
     global DELAY
@@ -26,14 +53,15 @@ def rewind_video(buffer, webcam):
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)  # to greyscale
         cv2.imshow('frame',gray)                        # show the frame frame
         # if the face comes back stop rewinding
-        if (i % 10) == 9:
+        if (i % SCAN_FACES) == 9:
             t_delta = time.time()
             if find_faces(webcam) > 0:
                 return index
 
         i += 1                                          # add to the counter
         cv2.waitKey(DELAY)               # wait for 25ms
-    return -1
+
+    return -1       # If surpasses buffer length, return to FRAME_0
 
 def unrewind_video(rewid_buffer, audio_buffer, index):
     global DELAY, MAX_REWIND, base_time
@@ -46,8 +74,8 @@ def unrewind_video(rewid_buffer, audio_buffer, index):
         cv2.waitKey(DELAY)                              # wait for 25ms
 
 
-def play_video(rewind_buffer, video, audio_buffer):
-    global mute, DELAY, base_time
+def play_video(rewind_buffer, video, audio_buffer, faces_amount):
+    global mute, DELAY, base_time, old_faces_amount, multiplier
     ret, frame = video.read()                 # get next frame
     frame_time = (mixer.music.get_pos()/1000) + base_time  # get audio time for frame
 
@@ -63,6 +91,10 @@ def play_video(rewind_buffer, video, audio_buffer):
     if mute:
        mixer.music.play()
        mute = 0
+
+    if not (old_faces_amount == faces_amount):
+        mixer.music.play(0, audio_speed(audio_buffer, faces_amount))
+        old_faces_amount = faces_amount
 
     cv2.imshow('frame',frame)               # show the frame
     cv2.waitKey(DELAY)                      # wait for 25ms
@@ -82,7 +114,7 @@ while not webcam.isOpened() and not video.isOpened():
 # Const
 MAX_REWIND = 300            # Max frames in rewind buffer
 DELAY = 21
-DELAY_MIN = 15
+SCAN_FACES = 10
 
 ret, frame = video.read()
 FRAME_0 = frame             # First frame
@@ -91,9 +123,11 @@ FRAME_0 = frame             # First frame
 # rewinding = False
 rewind_buffer = []
 faces_amount = 0
+old_faces_amount = 0
 
 # Guarda o momento do audio correspondente ao frame do buffer
 audio_buffer = []
+buffer_speed = 1
 base_time = 0
 mute = 1
 
@@ -112,9 +146,9 @@ while True:
 
     # Play the video while there are faces
     while faces_amount > 0:
-        for _ in range(10):
-            play_video(rewind_buffer, video, audio_buffer)
-        play_video(rewind_buffer, video, audio_buffer)
+        for _ in range(SCAN_FACES):
+            play_video(rewind_buffer, video, audio_buffer, faces_amount)
+        play_video(rewind_buffer, video, audio_buffer, faces_amount)
         faces_amount = find_faces(webcam)
 
 
@@ -129,7 +163,9 @@ while True:
     else:
         rewind_buffer = []
         audio_buffer = []
+        buffer_speed = 1
         base_time = 0
+        mixer.music.load('deep_time.ogg')
         mute = 1
         video.release()
         video = cv2.VideoCapture('deep_time.mp4')
