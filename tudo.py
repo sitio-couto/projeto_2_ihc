@@ -1,5 +1,7 @@
 import numpy as np
 import cv2
+from pygame import mixer
+import time
 from time import sleep
 
 def find_faces(webcam):
@@ -14,38 +16,56 @@ def find_faces(webcam):
 
 
 def rewind_video(buffer, webcam):
+    global DELAY
     print("Rewinding")
+
+    mixer.music.stop() # stops audio playback
+
     i = 0
     for index, frame in enumerate(reversed(buffer)):
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)  # to greyscale
         cv2.imshow('frame',gray)                        # show the frame frame
         # if the face comes back stop rewinding
         if (i % 10) == 9:
+            t_delta = time.time()
             if find_faces(webcam) > 0:
                 return index
-            else:
-                cv2.waitKey(15)
+
         i += 1                                          # add to the counter
-        cv2.waitKey(25)                                 # wait for 25ms
+        cv2.waitKey(DELAY)               # wait for 25ms
     return -1
 
-def unrewind_video(buffer, index):
+def unrewind_video(rewid_buffer, audio_buffer, index):
+    global DELAY, MAX_REWIND, base_time
     print("Unrewinding")
-    buffer_cut = buffer[300-index:]
+    buffer_cut = rewind_buffer[len(rewind_buffer)-index:]
+    base_time = audio_buffer[len(rewind_buffer)-index]
+    mixer.music.play(0, base_time)
     for frame in buffer_cut:
-        cv2.imshow('frame',frame)                        # show the frame frame
-        cv2.waitKey(25)                                 # wait for 25ms
+        cv2.imshow('frame',frame)                       # show the frame frame
+        cv2.waitKey(DELAY)                              # wait for 25ms
 
 
-def play_video(rewind_buffer, video, delay=25):
-    ret, frame = video.read()               # get next frame
-    # mantem o rewind buffer
+def play_video(rewind_buffer, video, audio_buffer):
+    global mute, DELAY, base_time
+    ret, frame = video.read()                 # get next frame
+    frame_time = (mixer.music.get_pos()/1000) + base_time  # get audio time for frame
+
+    # updates audio and video buffers
     rewind_buffer.append(frame)
+    audio_buffer.append(frame_time)
+
+    # check buffers for max capacity
     if len(rewind_buffer) > MAX_REWIND:
         rewind_buffer.pop(0)
+        audio_buffer.pop(0)
+
+    if mute:
+       mixer.music.play()
+       mute = 0
 
     cv2.imshow('frame',frame)               # show the frame
-    cv2.waitKey(delay)                         # wait for 25ms
+    cv2.waitKey(DELAY)                      # wait for 25ms
 
 
 # Open the Haar Cascade
@@ -53,7 +73,7 @@ face_cascade = cv2.CascadeClassifier("cascade_face.xml")
 # Open webcam
 webcam = cv2.VideoCapture(0)
 # Open video
-video = cv2.VideoCapture('Britney Spears - ...Baby One More Time.mp4')
+video = cv2.VideoCapture('deep_time.mp4')
 
 # wait for things to actually open
 while not webcam.isOpened() and not video.isOpened():
@@ -61,7 +81,7 @@ while not webcam.isOpened() and not video.isOpened():
 
 # Const
 MAX_REWIND = 300            # Max frames in rewind buffer
-DELAY = 25
+DELAY = 21
 DELAY_MIN = 15
 
 ret, frame = video.read()
@@ -72,6 +92,14 @@ FRAME_0 = frame             # First frame
 rewind_buffer = []
 faces_amount = 0
 
+# Guarda o momento do audio correspondente ao frame do buffer
+audio_buffer = []
+base_time = 0
+mute = 1
+
+# Inicializa modulo e carrega arquivo de som
+mixer.init()
+mixer.music.load('deep_time.ogg')
 
 while True:
     # Stay on frame 1
@@ -85,8 +113,8 @@ while True:
     # Play the video while there are faces
     while faces_amount > 0:
         for _ in range(10):
-            play_video(rewind_buffer, video)
-        play_video(rewind_buffer, video, DELAY_MIN)
+            play_video(rewind_buffer, video, audio_buffer)
+        play_video(rewind_buffer, video, audio_buffer)
         faces_amount = find_faces(webcam)
 
 
@@ -96,12 +124,15 @@ while True:
     #TODO When we run out of buffer go back to the main loop
     if index > 0:
         #before that, play again what was rewinded
-        unrewind_video(rewind_buffer, index)
+        unrewind_video(rewind_buffer, audio_buffer, index)
         continue
     else:
         rewind_buffer = []
+        audio_buffer = []
+        base_time = 0
+        mute = 1
         video.release()
-        video = cv2.VideoCapture('Britney Spears - ...Baby One More Time.mp4')
+        video = cv2.VideoCapture('deep_time.mp4')
 
 
 webcam.release()
