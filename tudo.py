@@ -4,7 +4,7 @@ from pygame import mixer
 import time
 from time import sleep
 
-test_flag = 7
+test_flag = 1
 def find_faces(webcam):
     global test_flag
 
@@ -24,7 +24,7 @@ def audio_speed(audio_buffer, faces_amount):
 
     if faces_amount == 1:
         DELAY = 21
-        SCAN_FACES = 10
+        SCAN_FACES = 1
         multiplier = buffer_speed/1
         buffer_speed = 1
         mixer.music.load('deep_time.ogg')
