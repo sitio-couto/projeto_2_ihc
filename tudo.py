@@ -84,7 +84,7 @@ def unrewind_video(rewid_buffer, audio_buffer, index):
 
 
 def play_video(rewind_buffer, video, audio_buffer, faces_amount):
-    global mute, DELAY, base_time, old_faces_amount, multiplier
+    global i, mute, DELAY, base_time, old_faces_amount, multiplier
     ret, frame = video.read()                 # get next frame
     frame_time = (mixer.music.get_pos()/1000) + base_time  # get audio time for frame
 
@@ -104,9 +104,15 @@ def play_video(rewind_buffer, video, audio_buffer, faces_amount):
     if not (old_faces_amount == faces_amount):
         mixer.music.play(0, audio_speed(audio_buffer, faces_amount))
         old_faces_amount = faces_amount
+        cv2.imshow('frame',frame)               # show the frame
+        cv2.waitKey(1)                      # wait for 25m
+        i = 0
+    else:
+        i += 1
+        cv2.imshow('frame',frame)               # show the frame
+        if i < 20: cv2.waitKey(1)                      # wait for 25ms
+        else: cv2.waitKey(DELAY)
 
-    cv2.imshow('frame',frame)               # show the frame
-    cv2.waitKey(DELAY)                      # wait for 25ms
 
 
 # Open the Haar Cascade
@@ -137,6 +143,7 @@ audio_buffer = []
 buffer_speed = 1
 base_time = 0
 mute = 1
+i = 0
 
 # Inicializa modulo e carrega arquivo de som
 mixer.init()
