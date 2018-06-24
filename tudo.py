@@ -1,13 +1,9 @@
 import numpy as np
 import cv2
 from pygame import mixer
-import time
 from time import sleep
 
-test_flag = 1
 def find_faces(webcam):
-    global test_flag
-
     try:
         ret, image = webcam.read()                                      #capture from webcam
     except:
@@ -16,8 +12,7 @@ def find_faces(webcam):
     grayscaled_image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)          # to greyscale
     faces = face_cascade.detectMultiScale(grayscaled_image, 1.3, 5)     # find faces in the image
 
-    if test_flag < 0: return len(faces)                                                   # return faces quantity
-    else: return test_flag
+    return len(faces)                                 # return faces quantity
 
 def audio_speed(audio_buffer, faces_amount):
     global DELAY, buffer_speed, base_time
@@ -53,19 +48,18 @@ def audio_speed(audio_buffer, faces_amount):
 
     return base_time
 
-def rewind_video(buffer, webcam):
+def rewind_video(video_buffer, webcam):
     global DELAY
     print("Rewinding")
 
     mixer.music.stop() # stops audio playback
 
     i = 0
-    for index, frame in enumerate(reversed(buffer)):
+    for index, frame in enumerate(reversed(video_buffer)):
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)  # to greyscale
         cv2.imshow('frame',gray)                        # show the frame frame
         # if the face comes back stop rewinding
-        if (i % 10) == 9:
-            t_delta = time.time()
+        if (i % 5) == 4:
             if find_faces(webcam) > 0:
                 return index
 
@@ -80,7 +74,11 @@ def unrewind_video(rewid_buffer, audio_buffer, index):
     buffer_cut = rewind_buffer[len(rewind_buffer)-index:]
     base_time = audio_buffer[len(rewind_buffer)-index]
     mixer.music.play(0, base_time)
+
+    i = 0;
     for frame in buffer_cut:
+        i += 1
+        if i == SCAN_FACES: find_faces(webcam)
         cv2.imshow('frame',frame)                       # show the frame frame
         cv2.waitKey(DELAY)                              # wait for 25ms
 
@@ -127,14 +125,12 @@ MAX_REWIND = 300            # Max frames in rewind buffer
 DELAY = 21
 SCAN_FACES = 10
 
-ret, frame = video.read()
-FRAME_0 = frame             # First frame
-
 # Vars
 # rewinding = False
 rewind_buffer = []
 faces_amount = 0
 old_faces_amount = 0
+# thumb = cv2.imread('thumb.png', cv2.IMREAD_COLOR)
 
 # Guarda o momento do audio correspondente ao frame do buffer
 audio_buffer = []
@@ -147,13 +143,13 @@ mixer.init()
 mixer.music.load('deep_time.ogg')
 
 while True:
-    # Stay on frame 1
-    cv2.imshow('frame', FRAME_0)
 
     # Until find faces
     while faces_amount == 0:
+        # cv2.imshow('frame', thumb)
+        # cv2.waitKey(DELAY)
         faces_amount = find_faces(webcam)
-        sleep(0.5)
+        sleep(0.2)
 
     # Play the video while there are faces
     while faces_amount > 0:
