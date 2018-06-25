@@ -3,8 +3,8 @@ from time import sleep
 import cv2, serial
 
 
-__FACES__ = 4
-__LEDRG__ = 1
+__FACES__ = -1
+__LEDRG__ = -1
 
 def find_faces(webcam):
     global __FACES__
@@ -30,48 +30,48 @@ def led_status():
     else: return __LEDRG__
 
 def sync_audio():
-    global AUDIO_DELAY, base_time, audio_length, frame_count, skip_frame, divider
+    global AUDIO_DELAY, VIDEO_DELAY, DELAY, base_time, audio_length, frame_count
 
-    divider = 1;
     frame_time = (mixer.music.get_pos()/1000) + base_time  # get audio time for frame
     delay = frame_time - (frame_count*audio_length/9066)
 
     if abs(delay) > AUDIO_DELAY: print('SYNC|| frame: ', frame_count, ' | delay: ', delay)
 
     if delay < -1*AUDIO_DELAY:
+        DELAY = VIDEO_DELAY
         sleep(abs(delay))
     elif delay > AUDIO_DELAY:
-        divider = DELAY
+        DELAY = 1
 
     return frame_time
 
 
 def audio_speed(audio_buffer, faces_amount):
-    global DELAY, SCAN_FACES, buffer_speed, base_time, audio_length, skip_frame
+    global VIDEO_DELAY, SCAN_FACES, buffer_speed, base_time, audio_length, skip_frame
 
     if faces_amount == 1:
-        DELAY = 43
+        VIDEO_DELAY = 43
         SCAN_FACES = 7
         multiplier = buffer_speed/1
         buffer_speed = 1
         audio_length = 453
         mixer.music.load('deep_time.ogg')
     elif faces_amount == 2:
-        DELAY = 32
+        VIDEO_DELAY = 32
         SCAN_FACES = 30
         multiplier = buffer_speed/1.2
         buffer_speed = 1.2
         audio_length = 377
         mixer.music.load('deep_time_x12.ogg')
     elif faces_amount == 3:
-        DELAY = 31
+        VIDEO_DELAY = 31
         SCAN_FACES = 30
         multiplier = buffer_speed/1.4
         buffer_speed = 1.4
         audio_length = 323
         mixer.music.load('deep_time_x14.ogg')
     else:
-        DELAY = 20
+        VIDEO_DELAY = 20
         SCAN_FACES = 30
         multiplier = buffer_speed/1.6
         buffer_speed = 1.6
@@ -101,12 +101,12 @@ def rewind_video(video_buffer, webcam):
                 return index
 
         i += 1                                          # add to the counter
-        cv2.waitKey(int(DELAY/divider))               # wait for 25ms
+        cv2.waitKey(DELAY)               # wait for 25ms
 
     return -1       # If surpasses buffer length, return to FRAME_0
 
 def unrewind_video(rewid_buffer, audio_buffer, index):
-    global DELAY, SCAN_FACES, MAX_REWIND, base_time, led, frame_count, divider
+    global DELAY, SCAN_FACES, MAX_REWIND, base_time, led, frame_count
     print("Unrewinding")
     buffer_cut = rewind_buffer[len(rewind_buffer)-index:]
     base_time = audio_buffer[len(rewind_buffer)-index]
@@ -119,9 +119,10 @@ def unrewind_video(rewid_buffer, audio_buffer, index):
             find_faces(webcam)
             led = led_status()
 
+        sync_audio()
         frame_count += 1
         cv2.imshow('frame',frame)                       # show the frame frame
-        cv2.waitKey(int(DELAY/divider))                              # wait for 25ms
+        cv2.waitKey(DELAY)                              # wait for 25ms
 
     return
 
@@ -148,15 +149,9 @@ def play_video(rewind_buffer, video, audio_buffer, faces_amount):
     if not (old_faces_amount == faces_amount):
         mixer.music.play(0, audio_speed(audio_buffer, faces_amount))
         old_faces_amount = faces_amount
-    #     cv2.imshow('frame',frame)               # show the frame
-    #     cv2.waitKey(1)                      # wait for 25m
-    #     i = 0
-    # else:
-    #     i += 1
+
     cv2.imshow('frame',frame)               # show the frame
-    # if i < FRAME_SKIP: cv2.waitKey(1)
-    # else: cv2.waitKey(DELAY)
-    cv2.waitKey(int(DELAY/divider))
+    cv2.waitKey(DELAY)
 
 
 face_cascade = cv2.CascadeClassifier("cascade_face.xml") # Open the Haar Cascade
@@ -170,8 +165,9 @@ while not webcam.isOpened() and not video.isOpened() and board.is_open:
 
 # Globals
 MAX_REWIND = 300            # Max frames in rewind buffer
-DELAY = 43
+VIDEO_DELAY = 43
 AUDIO_DELAY = 0.1
+DELAY = 43
 SCAN_FACES = 7
 FRAME_SKIP = 30
 serial = [0]
