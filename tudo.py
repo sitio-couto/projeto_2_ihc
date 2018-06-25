@@ -3,7 +3,7 @@ from time import sleep
 import cv2, serial
 
 
-__FACES__ = 2
+__FACES__ = 4
 __LEDRG__ = 1
 
 def find_faces(webcam):
@@ -41,7 +41,7 @@ def sync_audio():
     if delay < -1*AUDIO_DELAY:
         sleep(abs(delay))
     elif delay > AUDIO_DELAY:
-        divider = skip_frame
+        divider = DELAY
 
     return frame_time
 
@@ -55,7 +55,6 @@ def audio_speed(audio_buffer, faces_amount):
         multiplier = buffer_speed/1
         buffer_speed = 1
         audio_length = 453
-        skip_frame = 3
         mixer.music.load('deep_time.ogg')
     elif faces_amount == 2:
         DELAY = 32
@@ -63,19 +62,20 @@ def audio_speed(audio_buffer, faces_amount):
         multiplier = buffer_speed/1.2
         buffer_speed = 1.2
         audio_length = 377
-        skip_frame = 6
         mixer.music.load('deep_time_x12.ogg')
     elif faces_amount == 3:
-        DELAY = 12
-        SCAN_FACES = 25
+        DELAY = 31
+        SCAN_FACES = 30
         multiplier = buffer_speed/1.4
         buffer_speed = 1.4
+        audio_length = 323
         mixer.music.load('deep_time_x14.ogg')
     else:
-        DELAY = 9
+        DELAY = 20
         SCAN_FACES = 30
         multiplier = buffer_speed/1.6
         buffer_speed = 1.6
+        audio_length = 283
         mixer.music.load('deep_time_x16.ogg')
 
     for time in audio_buffer: time *= multiplier
