@@ -63,7 +63,7 @@ def audio_speed(audio_buffer, faces_amount):
         multiplier = buffer_speed/1.2
         buffer_speed = 1.2
         audio_length = 377
-        skip_frame = 3
+        skip_frame = 6
         mixer.music.load('deep_time_x12.ogg')
     elif faces_amount == 3:
         DELAY = 12
