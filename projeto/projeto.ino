@@ -64,13 +64,15 @@ void setup() {
 }
 
 void loop() {
-    if (is_buzzing) {
-        if (++loops_buzzing >= MAX_LOOPS_BUZZING) {
-            digitalWrite(buzzer_pin, LOW);
-            is_buzzing = false;
-            loops_buzzing = 0;
-        }
-    }
+    // if (is_buzzing) {
+    //     if (++loops_buzzing >= MAX_LOOPS_BUZZING) {
+    //         digitalWrite(buzzer_pin, LOW);
+    //         is_buzzing = false;
+    //         loops_buzzing = 0;
+    //     }
+    // }
+
+    delayMicroseconds(30000);
 
     // clears the trig_pin
     digitalWrite(trig_pin, LOW);
@@ -82,8 +84,8 @@ void loop() {
     // reads the echo_pin and returns the sound wave travel time in microseconds
     int distance = pulseIn(echo_pin, HIGH)*0.034/2;
 
-    Serial.print("Distance: ");
-    Serial.println(distance);
+    // Serial.print("Distance: ");
+    // Serial.println(distance);
 
     if (stored_distances < MAX_STORED_DISTANCES) {
         distances[stored_distances++] = distance;
@@ -93,21 +95,26 @@ void loop() {
     }
 
     // calculates the median of the last stored distances
-    int median = median(distances, stored_distances);
+    int mediana = median(distances, stored_distances);
 
-    Serial.print("Median: ");
-    Serial.println(median);
+    // Serial.print("Median: ");
+    // Serial.println(mediana);
 
-    if (median > max_dist) {
-        if (has_observers) {
+    if (mediana > max_dist) {
+        if (has_observers){
+            Serial.write(0);
+
             has_observers = false;
-            digitalWrite(buzzer_pin, HIGH);
-            is_buzzing = true;
-            loops_buzzing = 1;
+            // digitalWrite(buzzer_pin, HIGH);
+            // is_buzzing = true;
+            // loops_buzzing = 1;
         }
         red   = 255;
         green = 0;
+
     } else {
+        Serial.write(1);
+
         has_observers = true;
         red   = 0;
         green = 255;
@@ -125,14 +132,17 @@ void loop() {
 // note that v_size should be less or equal to MAX_STORED_DISTANCES
 int median(int *v, int v_size) {
     int vec[MAX_STORED_DISTANCES];
-    int i = 0;
-    for (; i < MAX_STORED_DISTANCES; ++i) vec[c] = v[c];
+    int j, i;
+
+    for (i = 0 ; i < MAX_STORED_DISTANCES; ++i) vec[i] = v[i];
+  
     for (i = 0; i < v_size; ++i) {
         for (j = i-1; (j >= 0) && (vec[j] > vec[i]); --j) {
             vec[j+1] = vec[j];
         }
         vec[j+1] = vec[i];
     }
+
     return vec[v_size/2];
 }
 
