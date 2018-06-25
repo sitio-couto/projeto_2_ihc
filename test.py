@@ -1,19 +1,16 @@
-import serial
+import cv2
+from pygame import mixer
 
-port = 'COM3'
-baudrate = 115200
+mixer.init()
+mixer.music.load('deep_time.ogg')
+video = cv2.VideoCapture('deep_time_20fps.mp4') # Open video
+i = 0
 
-ser = serial.Serial(port, baudrate)
+print(len(mixer.music))
 
 while True:
-
-    while not ser.is_open: ser.open()
-
-    while ser.is_open:
-        if (ser.in_waiting):
-            input = ser.read(ser.in_waiting)
-
-            if input[-1]:
-                print("LUZ VERDE!!!")
-            else:
-                print("LUZ VERMELHA!!!")
+    ret, frame = video.read()
+    cv2.imshow('frame', frame)
+    cv2.waitKey(1)
+    if not i%300: mixer.music.play(0, i*453/9066)
+    # print(i)
