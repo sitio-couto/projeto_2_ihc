@@ -7,6 +7,8 @@ __FACES__ = 2
 __LEDRG__ = 1
 
 def find_faces(webcam):
+    global __FACES__
+
     try:
         ret, image = webcam.read()                                      #capture from webcam
     except:
@@ -19,7 +21,7 @@ def find_faces(webcam):
     else: return __FACES__
 
 def led_status():
-    global board, serial
+    global board, serial, __LEDRG
 
     if board.in_waiting:                      # Se houver novas entradas
         serial = board.read(board.in_waiting) # Le todas as novas entradas
@@ -28,49 +30,40 @@ def led_status():
     else: return __LEDRG__
 
 def sync_audio():
-    global AUDIO_DELAY, base_time, audio_legth, frame_count, skip_frame
+    global AUDIO_DELAY, base_time, audio_length, frame_count, skip_frame, divider
 
-    skip_frame = 1
+    divider = 1;
     frame_time = (mixer.music.get_pos()/1000) + base_time  # get audio time for frame
-    delay = frame_time - (frame_count*audio_legth/9066)
+    delay = frame_time - (frame_count*audio_length/9066)
 
     if abs(delay) > AUDIO_DELAY: print('SYNC|| frame: ', frame_count, ' | delay: ', delay)
 
     if delay < -1*AUDIO_DELAY:
         sleep(abs(delay))
     elif delay > AUDIO_DELAY:
-        skip_frame = 3
+        divider = skip_frame
 
     return frame_time
 
-def skip_frame():
-    global rewind_buffer, audio_buffer
-
-    frame_count += 1          # update frames amount
-    ret, frame = video.read() # get next frame
-
-    rewind_buffer.append(frame)
-    audio_buffer.append(frame_time)
-
-    return
-
 
 def audio_speed(audio_buffer, faces_amount):
-    global DELAY, SCAN_FACES, buffer_speed, base_time
+    global DELAY, SCAN_FACES, buffer_speed, base_time, audio_length, skip_frame
 
     if faces_amount == 1:
         DELAY = 43
         SCAN_FACES = 7
         multiplier = buffer_speed/1
         buffer_speed = 1
-        audio_legth = 453
+        audio_length = 453
+        skip_frame = 3
         mixer.music.load('deep_time.ogg')
     elif faces_amount == 2:
-        DELAY = 16
-        SCAN_FACES = 10
+        DELAY = 32
+        SCAN_FACES = 30
         multiplier = buffer_speed/1.2
         buffer_speed = 1.2
-        audio_legth = 377
+        audio_length = 377
+        skip_frame = 3
         mixer.music.load('deep_time_x12.ogg')
     elif faces_amount == 3:
         DELAY = 12
@@ -92,7 +85,7 @@ def audio_speed(audio_buffer, faces_amount):
     return base_time
 
 def rewind_video(video_buffer, webcam):
-    global DELAY, frame_count, skip_frame
+    global DELAY, frame_count, divider
     print("Rewinding")
 
     mixer.music.stop() # stops audio playback
@@ -108,12 +101,12 @@ def rewind_video(video_buffer, webcam):
                 return index
 
         i += 1                                          # add to the counter
-        cv2.waitKey(int(DELAY/skip_frame))               # wait for 25ms
+        cv2.waitKey(int(DELAY/divider))               # wait for 25ms
 
     return -1       # If surpasses buffer length, return to FRAME_0
 
 def unrewind_video(rewid_buffer, audio_buffer, index):
-    global DELAY, SCAN_FACES, MAX_REWIND, base_time, led, skip_frame
+    global DELAY, SCAN_FACES, MAX_REWIND, base_time, led, frame_count, divider
     print("Unrewinding")
     buffer_cut = rewind_buffer[len(rewind_buffer)-index:]
     base_time = audio_buffer[len(rewind_buffer)-index]
@@ -128,12 +121,12 @@ def unrewind_video(rewid_buffer, audio_buffer, index):
 
         frame_count += 1
         cv2.imshow('frame',frame)                       # show the frame frame
-        cv2.waitKey(int(DELAY/skip_frame))                              # wait for 25ms
+        cv2.waitKey(int(DELAY/divider))                              # wait for 25ms
 
     return
 
 def play_video(rewind_buffer, video, audio_buffer, faces_amount):
-    global i, mute, DELAY, SCAN_FACES, base_time, old_faces_amount, multiplier, frame_count, audio_length
+    global mute, DELAY, SCAN_FACES, old_faces_amount, frame_count, divider
 
     frame_count += 1          # update frames amount
     ret, frame = video.read() # get next frame
@@ -152,9 +145,9 @@ def play_video(rewind_buffer, video, audio_buffer, faces_amount):
         rewind_buffer.pop(0)
         audio_buffer.pop(0)
 
-    # if not (old_faces_amount == faces_amount):
-    #     mixer.music.play(0, audio_speed(audio_buffer, faces_amount))
-    #     old_faces_amount = faces_amount
+    if not (old_faces_amount == faces_amount):
+        mixer.music.play(0, audio_speed(audio_buffer, faces_amount))
+        old_faces_amount = faces_amount
     #     cv2.imshow('frame',frame)               # show the frame
     #     cv2.waitKey(1)                      # wait for 25m
     #     i = 0
@@ -163,7 +156,7 @@ def play_video(rewind_buffer, video, audio_buffer, faces_amount):
     cv2.imshow('frame',frame)               # show the frame
     # if i < FRAME_SKIP: cv2.waitKey(1)
     # else: cv2.waitKey(DELAY)
-    cv2.waitKey(int(DELAY/skip_frame))
+    cv2.waitKey(int(DELAY/divider))
 
 
 face_cascade = cv2.CascadeClassifier("cascade_face.xml") # Open the Haar Cascade
@@ -188,11 +181,13 @@ rewind_buffer = []
 faces_amount = 0
 old_faces_amount = 0
 frame_count = 0
+skip_frame = 3
+divider = 1
 # thumb = cv2.imread('thumb.png', cv2.IMREAD_COLOR)
 
 # Guarda o momento do audio correspondente ao frame do buffer
 audio_buffer = []
-audio_legth = 453
+audio_length = 453
 buffer_speed = 1
 base_time = 0
 mute = 1
