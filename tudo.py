@@ -32,16 +32,17 @@ def led_status():
 def sync_audio():
     global AUDIO_DELAY, VIDEO_DELAY, DELAY, base_time, audio_length, frame_count
 
+    DELAY = VIDEO_DELAY
     frame_time = (mixer.music.get_pos()/1000) + base_time  # get audio time for frame
     delay = frame_time - (frame_count*audio_length/9066)
 
     if abs(delay) > AUDIO_DELAY: print('SYNC|| frame: ', frame_count, ' | delay: ', delay)
 
     if delay < -1*AUDIO_DELAY:
-        DELAY = VIDEO_DELAY
         sleep(abs(delay))
     elif delay > AUDIO_DELAY:
         DELAY = 1
+
 
     return frame_time
 
