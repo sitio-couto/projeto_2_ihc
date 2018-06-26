@@ -37,21 +37,21 @@ def audio_speed(faces_amount):
         multiplier = buffer_speed/1.2
         buffer_speed = 1.2
         audio_length = 377
-        mixer.music.load('deep_time_x12.ogg')
+        mixer.music.load('deep_time_x12_v2.ogg')
     elif faces_amount == 3:
         VIDEO_DELAY = 31
         SCAN_FACES = 30
         multiplier = buffer_speed/1.4
         buffer_speed = 1.4
         audio_length = 323
-        mixer.music.load('deep_time_x14.ogg')
+        mixer.music.load('deep_time_x14_v2.ogg')
     else:
         VIDEO_DELAY = 20
         SCAN_FACES = 30
         multiplier = buffer_speed/1.6
         buffer_speed = 1.6
         audio_length = 283
-        mixer.music.load('deep_time_x16.ogg')
+        mixer.music.load('deep_time_x16_v2.ogg')
 
     base_time = get_audio_checkpoint()
 
