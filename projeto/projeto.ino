@@ -7,10 +7,10 @@ const int blue_pin   = D7;
 const int buzzer_pin = D3;
 const int trig_pin   = D1;
 const int echo_pin   = D0;
-const int max_dist   = 100;
+const int max_dist   = 20;
 
 // stores the last MAX_STORED_DISTANCES distances
-const int MAX_STORED_DISTANCES = 321;
+const int MAX_STORED_DISTANCES = 31;
 boolean has_observers = false;
 int counter = 0;
 
@@ -53,14 +53,12 @@ void loop() {
     // Serial.println(mediana);
 
     if (mediana > max_dist) {
-        if (has_observers){
-            Serial.write(0);
-            has_observers = false;
-        }
+        if (has_observers) Serial.write(0);
+        has_observers = false;
         red   = 255;
         green = 0;
     } else {
-        Serial.write(1);
+        if (!has_observers) Serial.write(1);
         has_observers = true;
         red   = 0;
         green = 255;

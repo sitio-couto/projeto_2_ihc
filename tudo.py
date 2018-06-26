@@ -3,8 +3,8 @@ from time import sleep
 import cv2, serial
 
 
-__FACES__ = -1
-__LEDRG__ = 0
+__FACES__ = 0
+__LEDRG__ = -1
 
 def find_faces(webcam):
     global __FACES__
@@ -24,7 +24,7 @@ def find_faces(webcam):
 def audio_speed(faces_amount):
     global VIDEO_DELAY, SCAN_FACES, buffer_speed, base_time, audio_length
 
-    if faces_amount <= 1:
+    if faces_amount == 1 or faces_amount == 0:
         VIDEO_DELAY = 43
         SCAN_FACES = 7
         multiplier = buffer_speed/1
@@ -98,7 +98,7 @@ def play_video(rewind_buffer, video, faces_amount):
 
 ### UPDATE AUDIO SPEED ACCORDING TO THE LED AND FACES ###
 def update_playback_data():
-    global SCAN_FACES, update_cont, led, old_faces_amount, faces_amount
+    global SCAN_FACES, update_cont, old_led, led, old_faces_amount, faces_amount
     audio_updated = False
     update_cont += 1
 
@@ -106,12 +106,13 @@ def update_playback_data():
         led = led_status()
         faces_amount = find_faces(webcam)
 
-        if not (old_faces_amount == faces_amount):
+        if not (old_faces_amount == faces_amount) or not (led == old_led):
             mixer.music.play(0, audio_speed(faces_amount))
             old_faces_amount = faces_amount
+            old_led = led
             audio_updated = True
 
-    return audio_updated # Returns 1 if updates
+    return audio_updated or led # Returns 1 if updates
 
 ### REPLAYS FRAMES ###
 def replay_frame(frame):
@@ -151,12 +152,12 @@ def add_observers(frame):
 
 ### UPDATES LED STATUS READING SERIAL PORT ###
 def led_status():
-    global board, serial, __LEDRG
+    global board, serial_in, __LEDRG__
 
     if board.in_waiting:                      # Se houver novas entradas
-        serial = board.read(board.in_waiting) # Le todas as novas entradas
+        serial_in = board.read(board.in_waiting) # Le todas as novas entradas
 
-    if __LEDRG__ < 0: return serial[-1]       # Retorna cor mais recente do led
+    if __LEDRG__ < 0: return serial_in[-1]       # Retorna cor mais recente do led
     else: return __LEDRG__
 
 ### SYNCS VIDEO WITH THE EXPECTED AUDIO TIME ###
@@ -211,8 +212,9 @@ VIDEO_DELAY = 43
 AUDIO_DELAY = 0.1
 DELAY = 43
 SCAN_FACES = 7
-serial = [0]
-led = 1
+serial_in = [0]
+led = 0
+old_led = 0
 
 rewind_buffer = []
 faces_amount = 0
@@ -235,11 +237,12 @@ while not webcam.isOpened() and not video.isOpened() and board.is_open:
 
 while True:
     # Until find faces or led is green
-    while faces_amount <= 0 and not led_status():
+    while faces_amount <= 0 and not led:
         cv2.imshow('frame', thumb)
         cv2.waitKey(1)
+        led = led_status();
         faces_amount = find_faces(webcam)
-        if (faces_amount > 0 or led_status()):
+        if (faces_amount > 0 or led):
             fade_out(thumb, frame_0, 30);
         else: sleep(0.2)
 
@@ -252,24 +255,28 @@ while True:
     index = rewind_video(rewind_buffer, webcam)
 
     # When we run out of buffer go back to the main loop
-    if index > 0 or led:
+    if index > 0:
         #before that, play again what was rewinded
         unrewind_video(rewind_buffer, index)
         continue
     else:
-        last_frame = cv2.cvtColor(rewind_buffer[0], cv2.COLOR_BGR2GRAY)
+        if rewind_buffer:
+            last_frame = cv2.cvtColor(rewind_buffer[0], cv2.COLOR_BGR2GRAY)
+        else:
+            last_frame = frame_0
         last_frame = cv2.imwrite('last_frame.jpg',  last_frame)
         rewind_buffer = []
         buffer_speed = 1
         base_time = 0
         frame_count = 0
         old_faces_amount = 0
-        led = 1
+        led = 0
+        old_led = 0
         mute = 1
         mixer.music.load('deep_time.ogg')
         video.release()
         video = cv2.VideoCapture('deep_time_20fps.mp4')
-        fade_out(last_frame, thumb, 60);
+        fade_out(last_frame, thumb, 1000);
         print('Restarted')
 
 webcam.release()
