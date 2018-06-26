@@ -4,7 +4,7 @@ import cv2, serial
 
 
 __FACES__ = -1
-__LEDRG__ = -1
+__LEDRG__ = 0
 
 def find_faces(webcam):
     global __FACES__
@@ -107,10 +107,10 @@ def rewind_video(video_buffer, webcam):
     return -1       # If surpasses buffer length, return to FRAME_0
 
 def unrewind_video(rewid_buffer, audio_buffer, index):
-    global DELAY, SCAN_FACES, MAX_REWIND, base_time, led, frame_count
+    global DELAY, SCAN_FACES, MAX_REWIND, base_time, led, frame_count, audio_length
     print("Unrewinding")
     buffer_cut = rewind_buffer[len(rewind_buffer)-index:]
-    base_time = audio_buffer[len(rewind_buffer)-index]
+    base_time = (frame_count*audio_length/9066)
     mixer.music.play(0, base_time)
 
     i = 0;
