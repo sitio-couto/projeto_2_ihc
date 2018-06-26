@@ -3,7 +3,7 @@ from time import sleep
 import cv2, serial
 
 
-__FACES__ = 0
+__FACES__ = -1
 __LEDRG__ = -1
 
 def find_faces(webcam):
@@ -59,7 +59,7 @@ def audio_speed(faces_amount):
 
 ### REWINDS VIDEO ###
 def rewind_video(rewind_buffer, webcam):
-    global buffer_speed, index
+    global buffer_speed, index, faces_amount, led
     print("Rewinding")
 
     mixer.music.stop() # stops audio playback
@@ -68,12 +68,13 @@ def rewind_video(rewind_buffer, webcam):
     for i in range(len(rewind_buffer)-1, -1, -1):
         index += 1
         replay_frame(rewind_buffer[i])
-        if update_playback_data(): return index
+        update_playback_data()
+        if theres_people(): return index
 
     return -1       # If surpasses buffer length, return to FRAME_0
 
 ### REPLAYS WHAT WAS REWINDED ###
-def unrewind_video(rewind_buffer, faces_amount, led):
+def unrewind_video(rewind_buffer):
     global index
     print("Unrewinding")
 
@@ -81,9 +82,14 @@ def unrewind_video(rewind_buffer, faces_amount, led):
         index -= 1
         update_playback_data();
         display_frame(frame)
-        if (faces_amount <= 0 and not led): break
+        if not theres_people(): break
 
     return
+
+### CONDITION WICH DETERMINS IF THERE ARE PEOPLE ###
+def theres_people():
+    global faces_amount, led
+    return (faces_amount > 0 or led)
 
 ### PLAY VIDEO FORWARD ###
 def play_video(rewind_buffer, video, faces_amount):
@@ -102,20 +108,26 @@ def play_video(rewind_buffer, video, faces_amount):
 ### UPDATE AUDIO SPEED ACCORDING TO THE LED AND FACES ###
 def update_playback_data():
     global SCAN_FACES, update_cont, old_led, led, old_faces_amount, faces_amount
-    audio_updated = False
     update_cont += 1
 
     if (update_cont % SCAN_FACES) == 0:
         led = led_status()
         faces_amount = find_faces(webcam)
 
-        if not (old_faces_amount == faces_amount) or not (led == old_led):
+        if  not (old_faces_amount == faces_amount) or not (led == old_led):
             mixer.music.play(0, audio_speed(faces_amount))
             old_faces_amount = faces_amount
             old_led = led
-            audio_updated = True
 
-    return audio_updated or led # Returns 1 if updates
+    return # Returns 1 if updates
+
+### DEFINE AS CONDICOES EM QUE O AUDIO DEVE SER ATUALIZADO ###
+def update_conditions(faces_amount, old_faces_amount, led, old_led):
+    a = not (old_faces_amount == faces_amount) and (faces_amount >= 1) # Muda velocidade
+    b = not (old_led or old_faces_amount) and (faces_amount or led)   # resume ao video
+    c = (not old_led) and led and (not old_faces_amount) and (faces_amount)   # resume ao video
+    d = old_led and (not led) and old_faces_amount and (not faces_amount)
+    return a or b or c or d
 
 ### REPLAYS FRAMES ###
 def replay_frame(frame):
@@ -266,7 +278,7 @@ while True:
     # When we run out of buffer go back to the main loop
     if index > 0:
         #before that, play again what was rewinded
-        unrewind_video(rewind_buffer, faces_amount, led)
+        unrewind_video(rewind_buffer)
         continue
     else:
         if rewind_buffer:
