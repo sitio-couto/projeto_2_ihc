@@ -174,6 +174,13 @@ def get_audio_time():
     global base_time
     return (mixer.music.get_pos()/1000) + base_time
 
+def fade_out (img1, img2, len=10): #pass images here to fade between
+    for IN in range(0,len):
+        fadein = IN/float(len)
+        dst = cv2.addWeighted(img1, 1-fadein, img2, fadein, 0)
+        cv2.imshow('frame', dst)
+        cv2.waitKey(1)
+
 ################################################################################
 
 face_cascade = cv2.CascadeClassifier("cascade_face.xml") # Open the Haar Cascade
@@ -181,9 +188,8 @@ webcam = cv2.VideoCapture(0) # Open webcam
 video = cv2.VideoCapture('deep_time_20fps.mp4') # Open video
 board = serial.Serial('COM3', 115200)
 
-# wait for things to actually open
-while not webcam.isOpened() and not video.isOpened() and board.is_open:
-    continue
+thumb = cv2.imread('thumbnail.png', cv2.IMREAD_COLOR)
+frame_0 = cv2.imread('frame_0.png', cv2.IMREAD_COLOR)
 
 # Globals
 MAX_REWIND = 300            # Max frames in rewind buffer
@@ -199,30 +205,35 @@ rewind_buffer = []
 faces_amount = 0
 old_faces_amount = 0
 frame_count = 0
-skip_frame = 3
-divider = 1
-# thumb = cv2.imread('thumb.png', cv2.IMREAD_COLOR)
 
 # Guarda o momento do audio correspondente ao frame do buffer
 audio_length = 453
 buffer_speed = 1
 base_time = 0
-mute = 1
 i = 0
 
 # Inicializa modulo e carrega arquivo de som
 mixer.init()
 mixer.music.load('deep_time.ogg')
 
+# wait for things to actually open
+while not webcam.isOpened() and not video.isOpened() and board.is_open:
+    continue
+
 while True:
     # Until find faces or led is green
-    while faces_amount == 0 and not led_status():
+    while faces_amount <= 0 and not led_status():
+        cv2.imshow('frame', thumb)
+        cv2.waitKey(1)
         faces_amount = find_faces(webcam)
-        sleep(0.2)
+        if (faces_amount > 0 or led_status()):
+            fade_out(thumb, frame_0, 30);
+        else: sleep(0.2)
 
     # Play the video while there are faces
     while (faces_amount > 0 or led):
         play_video(rewind_buffer, video, faces_amount)
+        # if frame_count == 9066:
 
     # if the faces disappear, rewind video
     index = rewind_video(rewind_buffer, webcam)
@@ -233,6 +244,8 @@ while True:
         unrewind_video(rewind_buffer, index)
         continue
     else:
+        last_frame = cv2.cvtColor(rewind_buffer[0], cv2.COLOR_BGR2GRAY)
+        last_frame = cv2.imwrite('last_frame.jpg',  last_frame)
         rewind_buffer = []
         buffer_speed = 1
         base_time = 0
@@ -243,6 +256,7 @@ while True:
         mixer.music.load('deep_time.ogg')
         video.release()
         video = cv2.VideoCapture('deep_time_20fps.mp4')
+        fade_out(last_frame, thumb, 60);
         print('Restarted')
 
 webcam.release()
