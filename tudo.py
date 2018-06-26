@@ -20,37 +20,11 @@ def find_faces(webcam):
     if __FACES__ < 0: return len(faces)                                 # return faces quantity
     else: return __FACES__
 
-def led_status():
-    global board, serial, __LEDRG
 
-    if board.in_waiting:                      # Se houver novas entradas
-        serial = board.read(board.in_waiting) # Le todas as novas entradas
+def audio_speed(faces_amount):
+    global VIDEO_DELAY, SCAN_FACES, buffer_speed, base_time, audio_length
 
-    if __LEDRG__ < 0: return serial[-1]       # Retorna cor mais recente do led
-    else: return __LEDRG__
-
-def sync_audio():
-    global AUDIO_DELAY, VIDEO_DELAY, DELAY, base_time, audio_length, frame_count
-
-    DELAY = VIDEO_DELAY
-    frame_time = (mixer.music.get_pos()/1000) + base_time  # get audio time for frame
-    delay = frame_time - (frame_count*audio_length/9066)
-
-    if abs(delay) > AUDIO_DELAY: print('SYNC|| frame: ', frame_count, ' | delay: ', delay)
-
-    if delay < -1*AUDIO_DELAY:
-        sleep(abs(delay))
-    elif delay > AUDIO_DELAY:
-        DELAY = 1
-
-
-    return frame_time
-
-
-def audio_speed(audio_buffer, faces_amount):
-    global VIDEO_DELAY, SCAN_FACES, buffer_speed, base_time, audio_length, skip_frame
-
-    if faces_amount == 1:
+    if faces_amount <= 1:
         VIDEO_DELAY = 43
         SCAN_FACES = 7
         multiplier = buffer_speed/1
@@ -79,81 +53,128 @@ def audio_speed(audio_buffer, faces_amount):
         audio_length = 283
         mixer.music.load('deep_time_x16.ogg')
 
-    for time in audio_buffer: time *= multiplier
-
-    base_time = (mixer.music.get_pos()/1000 + base_time)*multiplier
+    base_time = get_audio_checkpoint()
 
     return base_time
 
 def rewind_video(video_buffer, webcam):
-    global DELAY, frame_count, divider
+    global DELAY, frame_count, divider, buffer_speed, old_faces_amount, faces_amount, base_time
     print("Rewinding")
 
     mixer.music.stop() # stops audio playback
+    buffer_speed = -1
 
-    i = 0
     for index, frame in enumerate(reversed(video_buffer)):
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)  # to greyscale
-        cv2.imshow('frame',gray)                        # show the frame frame
-        frame_count -= 1
-        # if the face comes back stop rewinding
-        if (i % 5) == 4:
-            if find_faces(webcam) > 0 or led_status():
-                return index
-
-        i += 1                                          # add to the counter
-        cv2.waitKey(DELAY)               # wait for 25ms
+        replay_frame(frame)
+        if update_playback_data(): return index
 
     return -1       # If surpasses buffer length, return to FRAME_0
 
-def unrewind_video(rewid_buffer, audio_buffer, index):
-    global DELAY, SCAN_FACES, MAX_REWIND, base_time, led, frame_count, audio_length
+def unrewind_video(rewid_buffer, index):
     print("Unrewinding")
     buffer_cut = rewind_buffer[len(rewind_buffer)-index:]
-    base_time = (frame_count*audio_length/9066)
-    mixer.music.play(0, base_time)
 
-    i = 0;
     for frame in buffer_cut:
-        i += 1
-        if i == SCAN_FACES:
-            find_faces(webcam)
-            led = led_status()
-
-        sync_audio()
-        frame_count += 1
-        cv2.imshow('frame',frame)                       # show the frame frame
-        cv2.waitKey(DELAY)                              # wait for 25ms
+        update_playback_data();
+        display_frame(frame)
 
     return
 
-def play_video(rewind_buffer, video, audio_buffer, faces_amount):
-    global mute, DELAY, SCAN_FACES, old_faces_amount, frame_count, divider
+def play_video(rewind_buffer, video, faces_amount):
 
-    frame_count += 1          # update frames amount
-    ret, frame = video.read() # get next frame
-    frame_time = sync_audio() # make sure audio is sychronized
-
-    if mute:
-       mixer.music.play()
-       mute = 0
-
-    # updates audio and video buffers
-    rewind_buffer.append(frame)
-    audio_buffer.append(frame_time)
+    ret, frame = video.read()   # get next frame
+    rewind_buffer.append(frame) # updates video buffer
 
     # check buffers for max capacity
-    if len(rewind_buffer) > MAX_REWIND:
+    if len(rewind_buffer) >= MAX_REWIND:
         rewind_buffer.pop(0)
-        audio_buffer.pop(0)
 
-    if not (old_faces_amount == faces_amount):
-        mixer.music.play(0, audio_speed(audio_buffer, faces_amount))
-        old_faces_amount = faces_amount
+    update_playback_data(); # Updates faces, LED and audio speed
+    display_frame(frame)    # Show frame
+    return
 
-    cv2.imshow('frame',frame)               # show the frame
-    cv2.waitKey(DELAY)
+def update_playback_data():
+    global SCAN_FACES, i, led, old_faces_amount, faces_amount
+    audio_updated = False
+    i += 1
 
+    if (i % SCAN_FACES) == 0:
+        led = led_status()
+        faces_amount = find_faces(webcam)
+
+        if not (old_faces_amount == faces_amount):
+            mixer.music.play(0, audio_speed(faces_amount))
+            old_faces_amount = faces_amount
+            audio_updated = True
+
+    return audio_updated # Returns 1 if updates
+
+def replay_frame(frame):
+    global DELAY, frame_count
+
+    frame_count -= 1
+    gray = cv2.cvtColor(add_observers(frame), cv2.COLOR_BGR2GRAY)  # to greyscale
+    cv2.imshow('frame', gray)                        # show the frame frame
+    cv2.waitKey(DELAY)               # wait for 25ms
+    return
+
+def display_frame(frame):
+    global DELAY, frame_count
+
+    sync_video()
+    frame_count += 1
+    cv2.imshow('frame', add_observers(frame))    # show the frame frame
+    cv2.waitKey(DELAY)                           # wait for DELAY
+    return
+
+def add_observers(frame):
+    global faces_amount, buffer_speed
+
+    frame_copy = frame.copy()
+
+    if buffer_speed > 0 and faces_amount == 0:
+        observers = 1
+    else:
+        observers = faces_amount
+
+    text = "OBSERVERS: " + str(observers) + " (x" + str(float(buffer_speed)) + ")"
+    cv2.putText(frame_copy, text, (10,50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,0))
+
+    return frame_copy
+
+def led_status():
+    global board, serial, __LEDRG
+
+    if board.in_waiting:                      # Se houver novas entradas
+        serial = board.read(board.in_waiting) # Le todas as novas entradas
+
+    if __LEDRG__ < 0: return serial[-1]       # Retorna cor mais recente do led
+    else: return __LEDRG__
+
+def sync_video():
+    global AUDIO_DELAY, VIDEO_DELAY, DELAY, buffer_speed
+
+    DELAY = VIDEO_DELAY
+    delay = get_audio_time() - get_audio_checkpoint()
+
+    if abs(delay) > AUDIO_DELAY: print('SYNC|',buffer_speed,'| frame: ', frame_count, ' | delay: ', delay)
+
+    if delay < -(AUDIO_DELAY):
+        sleep(abs(delay))
+    elif delay > AUDIO_DELAY:
+        DELAY = 1
+
+    return
+
+def get_audio_checkpoint():
+    global frame_count, audio_length
+    return (frame_count*audio_length/9066)
+
+def get_audio_time():
+    global base_time
+    return (mixer.music.get_pos()/1000) + base_time
+
+################################################################################
 
 face_cascade = cv2.CascadeClassifier("cascade_face.xml") # Open the Haar Cascade
 webcam = cv2.VideoCapture(0) # Open webcam
@@ -183,7 +204,6 @@ divider = 1
 # thumb = cv2.imread('thumb.png', cv2.IMREAD_COLOR)
 
 # Guarda o momento do audio correspondente ao frame do buffer
-audio_buffer = []
 audio_length = 453
 buffer_speed = 1
 base_time = 0
@@ -202,26 +222,22 @@ while True:
 
     # Play the video while there are faces
     while (faces_amount > 0 or led):
-        for _ in range(SCAN_FACES):
-            play_video(rewind_buffer, video, audio_buffer, faces_amount)
-        play_video(rewind_buffer, video, audio_buffer, faces_amount)
-        led = led_status()
-        faces_amount = find_faces(webcam)
+        play_video(rewind_buffer, video, faces_amount)
 
     # if the faces disappear, rewind video
     index = rewind_video(rewind_buffer, webcam)
 
-    #TODO When we run out of buffer go back to the main loop
+    # When we run out of buffer go back to the main loop
     if index > 0 or led:
         #before that, play again what was rewinded
-        unrewind_video(rewind_buffer, audio_buffer, index)
+        unrewind_video(rewind_buffer, index)
         continue
     else:
         rewind_buffer = []
-        audio_buffer = []
         buffer_speed = 1
         base_time = 0
         frame_count = 0
+        old_faces_amount = 0
         led = 1
         mute = 1
         mixer.music.load('deep_time.ogg')
