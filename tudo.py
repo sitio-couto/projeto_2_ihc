@@ -244,6 +244,7 @@ base_time = 0
 update_cont = 0
 
 start_flag = 1
+end_flag = 0
 
 # Inicializa modulo e carrega arquivo de som
 mixer.init()
@@ -270,13 +271,17 @@ while True:
     # Play the video while there are faces
     while (faces_amount > 0 or led):
         play_video(rewind_buffer, video, faces_amount)
-        # if frame_count == 9066:
+        print(frame_count)
+        if frame_count == 9066:
+            end_flag = 1
+            break
 
     # if the faces disappear, rewind video
-    index = rewind_video(rewind_buffer, webcam)
+    if not end_flag:
+        index = rewind_video(rewind_buffer, webcam)
 
     # When we run out of buffer go back to the main loop
-    if index > 0:
+    if index > 0 and not end_flag:
         #before that, play again what was rewinded
         unrewind_video(rewind_buffer)
         continue
@@ -295,6 +300,7 @@ while True:
         old_led = 0
         index = 0
         start_flag = 1
+        end_flag = 0
         mute = 1
         mixer.music.stop()
         mixer.music.load('deep_time.ogg')
