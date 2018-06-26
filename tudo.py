@@ -221,12 +221,13 @@ while True:
         audio_buffer = []
         buffer_speed = 1
         base_time = 0
+        frame_count = 0
         led = 1
         mute = 1
         mixer.music.load('deep_time.ogg')
         video.release()
-        video = cv2.VideoCapture('deep_time.mp4')
-
+        video = cv2.VideoCapture('deep_time_20fps.mp4')
+        print('Restarted')
 
 webcam.release()
 video.release()
