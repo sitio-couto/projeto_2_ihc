@@ -57,6 +57,7 @@ def audio_speed(faces_amount):
 
     return base_time
 
+### REWINDS VIDEO ###
 def rewind_video(video_buffer, webcam):
     global DELAY, frame_count, divider, buffer_speed, old_faces_amount, faces_amount, base_time
     print("Rewinding")
@@ -70,6 +71,7 @@ def rewind_video(video_buffer, webcam):
 
     return -1       # If surpasses buffer length, return to FRAME_0
 
+### REPLAYS WHAT WAS REWINDED ###
 def unrewind_video(rewid_buffer, index):
     print("Unrewinding")
     buffer_cut = rewind_buffer[len(rewind_buffer)-index:]
@@ -80,6 +82,7 @@ def unrewind_video(rewid_buffer, index):
 
     return
 
+### PLAY VIDEO FORWARD ###
 def play_video(rewind_buffer, video, faces_amount):
 
     ret, frame = video.read()   # get next frame
@@ -93,12 +96,13 @@ def play_video(rewind_buffer, video, faces_amount):
     display_frame(frame)    # Show frame
     return
 
+### UPDATE AUDIO SPEED ACCORDING TO THE LED AND FACES ###
 def update_playback_data():
-    global SCAN_FACES, i, led, old_faces_amount, faces_amount
+    global SCAN_FACES, update_cont, led, old_faces_amount, faces_amount
     audio_updated = False
-    i += 1
+    update_cont += 1
 
-    if (i % SCAN_FACES) == 0:
+    if (update_cont % SCAN_FACES) == 0:
         led = led_status()
         faces_amount = find_faces(webcam)
 
@@ -109,6 +113,7 @@ def update_playback_data():
 
     return audio_updated # Returns 1 if updates
 
+### REPLAYS FRAMES ###
 def replay_frame(frame):
     global DELAY, frame_count
 
@@ -118,6 +123,7 @@ def replay_frame(frame):
     cv2.waitKey(DELAY)               # wait for 25ms
     return
 
+### SHOW NEW FRAMES ###
 def display_frame(frame):
     global DELAY, frame_count
 
@@ -127,6 +133,7 @@ def display_frame(frame):
     cv2.waitKey(DELAY)                           # wait for DELAY
     return
 
+### ADDS OBSERVERS INDICATOR TO THE FRAME ###
 def add_observers(frame):
     global faces_amount, buffer_speed
 
@@ -142,6 +149,7 @@ def add_observers(frame):
 
     return frame_copy
 
+### UPDATES LED STATUS READING SERIAL PORT ###
 def led_status():
     global board, serial, __LEDRG
 
@@ -151,6 +159,7 @@ def led_status():
     if __LEDRG__ < 0: return serial[-1]       # Retorna cor mais recente do led
     else: return __LEDRG__
 
+### SYNCS VIDEO WITH THE EXPECTED AUDIO TIME ###
 def sync_video():
     global AUDIO_DELAY, VIDEO_DELAY, DELAY, buffer_speed
 
@@ -166,14 +175,17 @@ def sync_video():
 
     return
 
+### GETS EXPECTED AUDIO TIME ###
 def get_audio_checkpoint():
     global frame_count, audio_length
     return (frame_count*audio_length/9066)
 
+### GETS CURRENTE AUDIO TIME ###
 def get_audio_time():
     global base_time
     return (mixer.music.get_pos()/1000) + base_time
 
+### ADDS FADE EFFECT FROM img1 TO img2 ###
 def fade_out (img1, img2, len=10): #pass images here to fade between
     for IN in range(0,len):
         fadein = IN/float(len)
@@ -183,6 +195,8 @@ def fade_out (img1, img2, len=10): #pass images here to fade between
 
 ################################################################################
 
+cv2.namedWindow('frame', cv2.WINDOW_NORMAL);
+cv2.setWindowProperty('frame', cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN);
 face_cascade = cv2.CascadeClassifier("cascade_face.xml") # Open the Haar Cascade
 webcam = cv2.VideoCapture(0) # Open webcam
 video = cv2.VideoCapture('deep_time_20fps.mp4') # Open video
@@ -197,7 +211,6 @@ VIDEO_DELAY = 43
 AUDIO_DELAY = 0.1
 DELAY = 43
 SCAN_FACES = 7
-FRAME_SKIP = 30
 serial = [0]
 led = 1
 
@@ -210,7 +223,7 @@ frame_count = 0
 audio_length = 453
 buffer_speed = 1
 base_time = 0
-i = 0
+update_cont = 0
 
 # Inicializa modulo e carrega arquivo de som
 mixer.init()
