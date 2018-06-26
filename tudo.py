@@ -30,7 +30,7 @@ def audio_speed(faces_amount):
         multiplier = buffer_speed/1
         buffer_speed = 1
         audio_length = 453
-        mixer.music.load('deep_time.ogg')
+        mixer.music.load('deep_time_v2.ogg')
     elif faces_amount == 2:
         VIDEO_DELAY = 32
         SCAN_FACES = 30
@@ -271,7 +271,6 @@ while True:
     # Play the video while there are faces
     while (faces_amount > 0 or led):
         play_video(rewind_buffer, video, faces_amount)
-        print(frame_count)
         if frame_count == 9066:
             end_flag = 1
             break
