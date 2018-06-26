@@ -58,27 +58,30 @@ def audio_speed(faces_amount):
     return base_time
 
 ### REWINDS VIDEO ###
-def rewind_video(video_buffer, webcam):
-    global DELAY, frame_count, divider, buffer_speed, old_faces_amount, faces_amount, base_time
+def rewind_video(rewind_buffer, webcam):
+    global buffer_speed, index
     print("Rewinding")
 
     mixer.music.stop() # stops audio playback
     buffer_speed = -1
 
-    for index, frame in enumerate(reversed(video_buffer)):
-        replay_frame(frame)
+    for i in range(len(rewind_buffer)-1, -1, -1):
+        index += 1
+        replay_frame(rewind_buffer[i])
         if update_playback_data(): return index
 
     return -1       # If surpasses buffer length, return to FRAME_0
 
 ### REPLAYS WHAT WAS REWINDED ###
-def unrewind_video(rewid_buffer, index):
+def unrewind_video(rewind_buffer, faces_amount, led):
+    global index
     print("Unrewinding")
-    buffer_cut = rewind_buffer[len(rewind_buffer)-index:]
 
-    for frame in buffer_cut:
+    for frame in rewind_buffer[len(rewind_buffer)-index:]:
+        index -= 1
         update_playback_data();
         display_frame(frame)
+        if (faces_amount <= 0 and not led): break
 
     return
 
@@ -220,12 +223,15 @@ rewind_buffer = []
 faces_amount = 0
 old_faces_amount = 0
 frame_count = 0
+index = 0
 
 # Guarda o momento do audio correspondente ao frame do buffer
 audio_length = 453
 buffer_speed = 1
 base_time = 0
 update_cont = 0
+
+start_flag = 1
 
 # Inicializa modulo e carrega arquivo de som
 mixer.init()
@@ -236,13 +242,16 @@ while not webcam.isOpened() and not video.isOpened() and board.is_open:
     continue
 
 while True:
+    print('Main loop')
     # Until find faces or led is green
-    while faces_amount <= 0 and not led:
+    while start_flag and faces_amount <= 0 and not led:
         cv2.imshow('frame', thumb)
         cv2.waitKey(1)
         led = led_status();
         faces_amount = find_faces(webcam)
         if (faces_amount > 0 or led):
+            print('Starting')
+            start_flag = 0
             fade_out(thumb, frame_0, 30);
         else: sleep(0.2)
 
@@ -257,7 +266,7 @@ while True:
     # When we run out of buffer go back to the main loop
     if index > 0:
         #before that, play again what was rewinded
-        unrewind_video(rewind_buffer, index)
+        unrewind_video(rewind_buffer, faces_amount, led)
         continue
     else:
         if rewind_buffer:
@@ -272,11 +281,15 @@ while True:
         old_faces_amount = 0
         led = 0
         old_led = 0
+        index = 0
+        start_flag = 1
         mute = 1
+        mixer.music.stop()
         mixer.music.load('deep_time.ogg')
         video.release()
         video = cv2.VideoCapture('deep_time_20fps.mp4')
-        fade_out(last_frame, thumb, 1000);
+        last_frame = cv2.imread('last_frame.jpg', cv2.IMREAD_COLOR)
+        fade_out(last_frame, thumb, 60);
         print('Restarted')
 
 webcam.release()
