@@ -9,17 +9,17 @@ def find_faces(webcam):
     global __FACES__
 
     try:
-        ret, image = webcam.read()                                      #capture from webcam
+        ret, image = webcam.read() #capture from webcam
     except:
         print("Something went wrong")
         exit(0)
-    grayscaled_image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)          # to greyscale
-    faces = face_cascade.detectMultiScale(grayscaled_image, 1.3, 5)     # find faces in the image
+    grayscaled_image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)      # to greyscale
+    faces = face_cascade.detectMultiScale(grayscaled_image, 1.3, 5) # find faces in the image
 
-    if __FACES__ < 0: return len(faces)                                 # return faces quantity
+    if __FACES__ < 0: return len(faces) # return faces quantity
     else: return __FACES__  # if debugger set
 
-
+# TODO
 def audio_speed(faces_amount):
     global VIDEO_DELAY, SCAN_FACES, buffer_speed, base_time, audio_length
 
@@ -83,6 +83,7 @@ def unrewind_video(rewind_buffer, index):
 
     return 'play', 0 # Resume playing unchached frames
 
+# TODO
 ### CONDITION WICH DETERMINS IF THERE ARE PEOPLE ###
 def theres_people():
     global faces_amount, led
@@ -96,8 +97,7 @@ def play_video(rewind_buffer, frame_count):
         ret, frame = video.read()   # get next frame
         rewind_buffer.append(frame) # updates video buffer
 
-        # check buffers for max capacity
-        if len(rewind_buffer) >= MAX_REWIND:
+        if len(rewind_buffer) >= MAX_REWIND: # check buffers for max capacity
             rewind_buffer.pop(0)
 
         update_playback_data(); # Updates faces, LED and audio speed
@@ -122,22 +122,23 @@ def update_playback_data():
             old_faces_amount = faces_amount
             old_led = led
 
-    return # Returns 1 if updates
+    return
 
-### DEFINE AS CONDICOES EM QUE O AUDIO DEVE SER ATUALIZADO ###
-# As condicionais garantem o audio seja sincronizado apenas em momentos
-# necessarios, deixando o audio mais fluido
-def update_conditions(faces_amount, old_faces_amount, led, old_led):
-    # Muda velocidade (de [0:n] para [1:n], nao muda para zero)
-    a = not (old_faces_amount == faces_amount) and (faces_amount >= 1)
-    # resume ao video (esta em rewinding e deve voltar ao video)
-    b = not (old_led or old_faces_amount) and (faces_amount or led)
-    # No caso de haver uma mudanca simultanea de valores (sensor ativa, camera desativa)
-    c = (not old_led) and led and (not old_faces_amount) and faces_amount
-     # No caso de haver uma mudanca simultanea de valores (sensor desativa, camera ativa)
-    d = old_led and (not led) and old_faces_amount and (not faces_amount)
-
-    return a or b or c or d
+# ### DEFINE AS CONDICOES EM QUE O AUDIO DEVE SER ATUALIZADO ###
+# # As condicionais garantem o audio seja sincronizado apenas em momentos
+# # necessarios, deixando o audio mais fluido. Deveria ir na linha 120
+# # na condicao do segundo if, mas nao terminei de testar.
+# def update_conditions(faces_amount, old_faces_amount, led, old_led):
+#     # Muda velocidade (de [0:n] para [1:n], nao muda para zero)
+#     a = not (old_faces_amount == faces_amount) and (faces_amount >= 1)
+#     # resume ao video (esta em rewinding e deve voltar ao video)
+#     b = not (old_led or old_faces_amount) and (faces_amount or led)
+#     # No caso de haver uma mudanca simultanea de valores (sensor ativa, camera desativa)
+#     c = (not old_led) and led and (not old_faces_amount) and faces_amount
+#      # No caso de haver uma mudanca simultanea de valores (sensor desativa, camera ativa)
+#     d = old_led and (not led) and old_faces_amount and (not faces_amount)
+#
+#     return a or b or c or d
 
 ### REPLAYS FRAMES ###
 def replay_frame(frame):
@@ -279,8 +280,9 @@ update_cont = 0      # CONTADOR QUE INDICA QUANDO DEVE-SE EXECUTAR O CASCADE (ju
 start_flag = 1       # FLAG PARA HABILITAR O FADE_OUT DO INICO DO VIDEO
 end_flag = 0         # FLAG PARA PULAR rewind E unrewind E ENCERAR O VIDEO
 
-visual_files = {1:'thumbnail.png',2:'deep_time_20fps'}
-audio_files = {}
+visual_files = {'thumb':'thumbnail.png','video':'deep_time_20fps'}
+audio_files = {1:'deep_time.ogg',1.2:'deep_time_x12.ogg',1.4:'deep_time_x14.ogg',
+            1.6:'deep_time_x16.ogg',1.8:'deep_time_x18.ogg',2:'deep_time_x20.ogg'}
 
 
 ################################################################################
@@ -288,9 +290,9 @@ audio_files = {}
 face_cascade, webcam = boot_functions(); # Open stuff
 video = load_midia() # Load video and music
 
+# Sets up thumbnail and first_frame
 thumb = cv2.imread('thumbnail.png', cv2.IMREAD_COLOR)
 ret, first_frame = video.read()
-first_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
 current_state = 'start'
 index = 0
@@ -298,38 +300,33 @@ index = 0
 while True:
     print(current_state)
 
-    # Aguarda ate que a flag seja setada
-    while current_state == 'start':
-        # Mostra a thumbnail estatica
-        cv2.imshow('frame', thumb)
+    if current_state == 'start':
+        cv2.imshow('frame', thumb) # Mostra a thumbnail estatica
         cv2.waitKey(1)
-        # atualiza o led e o cascade
-        led = led_status();
-        faces_amount = find_faces(webcam)
-        # Comeca ou dorme
-        if (faces_amount > 0 or led):
-            current_state = 'play'
-            fade_out(thumb, first_frame, 30); # Fadeout from thumb to first_frame
-        else:
-            sleep(0.2)
 
-    if current_state == 'play':
-        # Play the video while there are faces, or led
+        while not theres_people(): # Aguarda observadores
+            led = led_status();
+            faces_amount = find_faces(webcam)
+            sleep(0.3)
+
+        fade_out(thumb, first_frame, 30); # Fadeout from thumb to first_frame
+        current_state = 'play'
+
+    elif current_state == 'play': # Play the video while there are faces, or led
         current_state, index = play_video(rewind_buffer, frame_count)
 
-    elif current_state == 'rewind':
-        # if the faces disappear, rewind video
+    elif current_state == 'rewind': # if the faces disappear, rewind video
         current_state, index = rewind_video(rewind_buffer, webcam, index)
 
-    elif current_state == 'unrewind':
-        #before that, play again what was rewinded
+    elif current_state == 'unrewind': # play what was rewinded
         current_state, index = unrewind_video(rewind_buffer, index)
 
-    elif current_state == 'restart':
-        if rewind_buffer:
-            last_frame = cv2.cvtColor(rewind_buffer[0], cv2.COLOR_BGR2GRAY)
-        else:
-            last_frame = frame_first
+    elif current_state == 'restart': # Reinicia variaveis, video e audio
+        if (rewind_buffer): last_frame = rewind_buffer[0]
+        else: last_frame = frame_first
+        fade_out(last_frame, thumb, 60); # Fades from last frame shown to thumb
+        mixer.music.stop()
+        video.release()
 
         rewind_buffer = []
         buffer_speed = 1
@@ -343,10 +340,7 @@ while True:
         end_flag = 0
         mute = 1
 
-        mixer.music.stop()
-        video.release()
         video = load_midia()
-        fade_out(last_frame, thumb, 60);
         current_state = 'start'
 
 webcam.release()
