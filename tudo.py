@@ -6,33 +6,63 @@ __FACES__ = -1 # Debugging: Fixa numero de faces (-1 desativa)
 __LEDRG__ = 0 # Debugging: Fixa valor do led (1-verde, 0-vermelho)
 
 ##### MAPPINGS ####################
+# Colocar paths da thumbnail e do video
 def visual_files(x):
     return {'image':'thumbnail.png',
             'video':'deep_time_20fps.mp4'
             }.get(x, 0)
 
+# Colocar os dados correspondentes a o numro de faces identificado
+# [<Path do arquivo>,<Velocidade>,<Delay entre frames>,<Periodo do cascade>]
 def speed_data(x):
     return {1:['deep_time_v2.ogg',1,43,7],
             2:['deep_time_x12_v2.ogg',1.2,32,30],
-            3:['deep_time_x14_v2.ogg',1.4,31,30],
-            4:['deep_time_x16_v2.ogg',1.6,20,30],
-            }.get(x, ['deep_time_x16.ogg',1.6,20,30])
+            3:['deep_time_x14_v2.ogg',1.4,31,40],
+            4:['deep_time_x16_v2.ogg',1.6,20,50],
+            }.get(x, ['deep_time_x16_v2.ogg',1.6,20,50])
 ### GLOBAL CONSTANTS ##############
-MAX_REWIND = 300    # Max frames in rewind buffer
-MAX_OFFSET = 0.1   # MARGEN DE ERRO PARA O AUDIO
-TOTAL_FRAMES = 9066 # TOTAL DE FRAMES NO VIDEO
-AUDIO_LENGTH_X1 = 453 # DURACAO (EM SEGUNDOS NA VELOLOCIDADE x1) DO AUDIO
-FRAME_DELAY = 2    # ATRASO PADRAO ENTRE FRAMES
-SCAN_FACES = 3      # PERIODO EM QUE SE EXECUTA O CASCADE
+MAX_REWIND = 300      # Max frames in rewind buffer
+MAX_OFFSET = 0.1      # MARGEN DE ERRO PARA O AUDIO
+TOTAL_FRAMES = 9066   # WARNING: TOTAL DE FRAMES NO VIDEO (varia entre videos)
+AUDIO_LENGTH_X1 = 453 # WARNING: DURACAO (EM SEGUNDOS NA VELO x1) DO AUDIO
+FILE_PATH = 0         # INDICE DO PATH DOS ARUIVOS DE AUDIO
+CURR_SPEED = 1        # INDICE DA VELOCIDADE CORRESPONDENTE AO NUMERO DE FACES
+FRAME_DELAY = 2       # INDICE PARA O DELAY DE cv2.waitKey(x)
+SCAN_FACES = 3        # INDICE DO PERIODO PARA EXECUTAR CASCADE
 ### GLOBAlS #######################
 def glb():
-    glb.led = 0             # VALOR DO LED
-    glb.old_led = 0         # VALOR ANTERIOR DO LED (checkar se mudou de estado)
-    glb.faces_amount = 0
-    glb.old_faces_amount = 0 # NUMER DE FACES ANTES DE ATUALIZAR
+    glb.led = 0              # VALOR DO LED
+    glb.old_led = 0          # VALOR ANTERIOR DO LED (checkar se mudou de estado)
+    glb.faces_amount = 0     # NUMERO DE FACES MAIS RECENTE
+    glb.old_faces_amount = 0 # NUMERO DE FACES ANTES DE ATUALIZAR
     glb.frame_count = 0      # FRAME ATUAL
     glb.base_time = 0        # TEMPO DE REFERECIA (necessario devido ao get_pos() da pygame)
-    glb.update_count = -1  # CONTA FRAMES ATE ATUAIZAR O CASCADE
+    glb.update_count = -1    # CONTA FRAMES ATE ATUAIZAR O CASCADE
+    glb.TOTAL_FRAMES = 0
+
+# def get_glb(x):
+#     return {'led':glb.led,
+#             'old_led':glb.old_led,
+#             'faces':glb.faces_amount,
+#             'old_faces':glb.old_faces_amount,
+#             'base_time':glb.basetime,
+#             'scan_count':glb.basetime,
+#             'total_frames':glb.total_frames
+#             }.get(x, missed('WRONG GLB VAR MAPPING!!')
+#
+# def set_glb(x, val)
+#     if (x =='led'): glb.led = val,
+#             'old_led':glb.old_led,
+#             'faces':glb.faces_amount,
+#             'old_faces':glb.old_faces_amount,
+#             'base_time':glb.basetime,
+#             'scan_count':glb.basetime,
+#             'total_frames':glb.total_frames
+#             }.get(x, missed('WRONG GLB VAR MAPPING!!')
+
+def missed(str):
+    print(str)
+    return 0
 ################################################################################
 
 def find_faces(webcam):
@@ -89,29 +119,30 @@ def play_video(rewind_buffer):
         update_playback_data(); # Updates faces, LED and audio speed
         display_frame(frame)    # Show frame
 
-        if (glb.frame_count == TOTAL_FRAMES):
+        if (video == glb.TOTAL_FRAMES):
             return 'ending', 0
 
     return 'rewind', (len(rewind_buffer) - 1)
 
 ### UPDATE AUDIO SPEED ACCORDING TO THE LED AND FACES ###
 def update_playback_data():
+    global SCAN_FACES, FILE_PATH
     glb.update_count += 1
 
-    if (glb.update_count % speed_data(glb.faces_amount)[3]) == 0:
+    if (glb.update_count % speed_data(glb.faces_amount)[SCAN_FACES]) == 0:
         glb.led = led_status()
         glb.faces_amount = find_faces(webcam)
 
         if not (glb.faces_amount == glb.old_faces_amount) or not (glb.led == glb.old_led):
             if (glb.faces_amount): # Se ha mais que 0 faces
-                mixer.music.load(speed_data(glb.faces_amount)[0])
+                mixer.music.load(speed_data(glb.faces_amount)[FILE_PATH])
             elif (glb.led): # Se ha 0 faces mas o led esta verde
-                mixer.music.load(speed_data(1)[0]) # Carrega audio de velo x1
+                mixer.music.load(speed_data(1)[FILE_PATH]) # Carrega audio de velo x1
             glb.base_time = get_audio_checkpoint() # Salva o tempo esperado do frame
             mixer.music.play(0, glb.base_time)
             glb.old_faces_amount = glb.faces_amount
             glb.old_led = glb.led
-        
+
     return
 
 # ### DEFINE AS CONDICOES EM QUE O AUDIO DEVE SER ATUALIZADO ###
@@ -132,10 +163,11 @@ def update_playback_data():
 
 ### REPLAYS FRAMES ###
 def replay_frame(frame):
+    global FRAME_DELAY
     glb.frame_count -= 1 # Decrementa frame retrocedido
     gray = cv2.cvtColor(add_observers(frame), cv2.COLOR_BGR2GRAY)  # to greyscale
     cv2.imshow('frame', gray)     # show the frame frame
-    cv2.waitKey(speed_data(1)[2]) # Velocidade de rewind e irrelevante, usa a de x1
+    cv2.waitKey(speed_data(1)[FRAME_DELAY]) # Velocidade de rewind e irrelevante, usa a de x1
     return
 
 ### SHOW NEW FRAMES ###
@@ -147,12 +179,13 @@ def display_frame(frame):
 
 ### ADDS OBSERVERS INDICATOR TO THE FRAME ###
 def add_observers(frame):
+    global CURR_SPEED
     frame_copy = frame.copy()   # Cria deep copy do frame
 
     # Verifica numero de obseradores e a velicidade
     if (glb.faces_amount):
         observers = glb.faces_amount
-        speed = speed_data(glb.faces_amount)[1]
+        speed = speed_data(glb.faces_amount)[CURR_SPEED]
     elif (glb.led): # Caso nao haja faces mas o led esteja aceso
         observers = 1
         speed = 1 # se for apenas o led, velo e sempre 1
@@ -178,14 +211,15 @@ def led_status():
 
 ### SYNCS VIDEO WITH THE EXPECTED AUDIO TIME ###
 def sync_video():
-    global MAX_OFFSET
+    global MAX_OFFSET, FRAME_DELAY, CURR_SPEED
 
-    delay = speed_data(glb.faces_amount)[2] # seta o delay como o padrao para a velocidade atual
+    delay = speed_data(glb.faces_amount)[FRAME_DELAY] # seta o delay como o padrao para a velocidade atual
     offset = get_audio_time() - get_audio_checkpoint() # Pega diferenca entre a posicao atual do audio, e a posicao
                                                        # esperada do audio para o frame atual (time - checkpoint)
     # mostra o delay (serve para regular DELAY e FACES, deixando o video mais fluido)
     if abs(offset) > MAX_OFFSET:
-        print('SYNC|x',speed_data(glb.faces_amount)[1],'| frame: ', glb.frame_count,' | offset:',offset)
+        text = 'SYNC|x' + str(speed_data(glb.faces_amount)[CURR_SPEED])
+        print(text + '| frame:', glb.frame_count,'| offset:',offset)
 
     # Verifica se o atraso excede a margem de erro MAX_OFFSET
     if offset < -(MAX_OFFSET):
@@ -200,9 +234,9 @@ def sync_video():
 # Calcula a duracao do audio na velocidade atual e retorna a posicao esperada
 # do audio (segundos) e retorna.
 def get_audio_checkpoint():
-    global TOTAL_FRAMES, AUDIO_LENGTH_X1
-    audio_length = AUDIO_LENGTH_X1/speed_data(glb.faces_amount)[1]
-    return (glb.frame_count*audio_length/TOTAL_FRAMES)
+    global AUDIO_LENGTH_X1, CURR_SPEED
+    audio_length = AUDIO_LENGTH_X1/speed_data(glb.faces_amount)[CURR_SPEED]
+    return (glb.frame_count*audio_length/glb.TOTAL_FRAMES)
 
 ### GETS CURRENTE AUDIO TIME ###
 # recupera o tempo desde o comando mixer.music.play() e acresenta basetime
@@ -218,6 +252,16 @@ def fade_out (img1, img2, len=10): #pass images here to fade between
         dst = cv2.addWeighted(img1, 1-fadein, img2, fadein, 0)
         cv2.imshow('frame', dst)
         cv2.waitKey(1)
+
+### GET LAST FRAME SHOWN IN GREYSCALE BUT WITH 3 CHANNELS ###
+def last_frame(rewind_buffer):
+    if (glb.frame_count == glb.TOTAL_FRAMES): # Se chegou ao fim do video
+        frame = rewind_buffer[-1]         # Pega ultimo frame do video com cor
+    else: # Se checgou a MAX_REWIND, pega o frame em preto e branco
+        frame = cv2.cvtColor(rewind_buffer[0], cv2.COLOR_BGR2GRAY)
+
+    # Retrona imagem com 3 canais (para o addWeighted) e obseradores
+    return cv2.cvtColor(add_observers(frame), cv2.COLOR_GRAY2BGR)
 
 ### BOOT UP ####################################################################
 
@@ -240,29 +284,34 @@ def boot_functions():
     print('BOOTED UP')
     return face_cascade, webcam, arduino
 
-def load_midia():
-    mixer.music.load(speed_data(1)[0])
-    video = cv2.VideoCapture(visual_files('video')) # Open video
+def load_midia(FILE_PATH):
+    first_frame = thumb = 0
 
-    while not video.isOpened(): continue
+    video = cv2.VideoCapture(visual_files('video'))        # Open video
+    glb.TOTAL_FRAMES = video.get(cv2.CAP_PROP_FRAME_COUNT) # Pega total de frames
+    while (not video.isOpened()): continue                 # espera abrir
 
-    print('Midia files set')
-    return video
+    ret, first_frame = video.read()                        # get first_frame
+    thumb = cv2.imread(visual_files('image'), cv2.IMREAD_COLOR) # Get thumb
+
+    track = mixer.Sound(speed_data(1)[FILE_PATH]) # Creates Sound object
+    glb.AUDIO_LENGTH_X1 = track.get_length()      # Gets duration of audio
+
+    video.set(cv2.CAP_PROP_POS_FRAMES , 0)     # Reseta o video pro 0
+    mixer.music.load(speed_data(1)[FILE_PATH]) # Abre audio x1
+
+    return video, thumb, first_frame
 
 ################################################################################
 ### MAIN LOOP ##################################################################
 
-face_cascade, webcam, arduino = boot_functions(); # Open stuff
-video = load_midia() # Load video and music
-
-# Setup thumbnail and first_frame
-thumb = cv2.imread(visual_files('image'), cv2.IMREAD_COLOR)
-ret, first_frame = video.read()
-
 glb() # initialize globals
+face_cascade, webcam, arduino = boot_functions(); # Open stuff
+video, thumb, first_frame = load_midia(FILE_PATH) # Load video and music
+
 current_state = 'start' # Estado do video
-rewind_buffer = []  # Buffer de frames
-index = 0   # indice para navegar pelo rewind buffer
+rewind_buffer = []      # Buffer de frames
+index = 0               # indice para navegar pelo rewind buffer
 
 while True:
     print(current_state)
@@ -276,7 +325,6 @@ while True:
             glb.faces_amount = find_faces(webcam)
             sleep(0.3)
 
-        mixer.music.play()
         fade_out(thumb, first_frame, 30); # Fadeout from thumb to first_frame
         current_state = 'play'
 
@@ -290,15 +338,11 @@ while True:
         current_state, index = unrewind_video(rewind_buffer, index)
 
     elif current_state == 'restart': # Reinicia variaveis, video e audio
-        if (rewind_buffer): last_frame = rewind_buffer[0]
-        else: last_frame = frame_first
-        fade_out(last_frame, thumb, 60); # Fades from last frame shown to thumb
-        mixer.music.stop()
-        video.release()
-        video = load_midia()
+        fade_out(last_frame(rewind_buffer), thumb, 60) # Fades back to thumb
+        glb()                 # Reset global vars
+        load_midia(FILE_PATH) # Reset midia, TOTAL_FRAMES and AUDIO_LENGTH_X1
         rewind_buffer = []
         index = 0
-        glb()
         current_state = 'start'
 
 webcam.release()
