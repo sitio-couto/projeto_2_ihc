@@ -21,14 +21,12 @@ def speed_data(x):
             4:['deep_time_x16_v2.ogg',1.6,20,50],
             }.get(x, ['deep_time_x16_v2.ogg',1.6,20,50])
 ### GLOBAL CONSTANTS ##############
-MAX_REWIND = 300      # Max frames in rewind buffer
-MAX_OFFSET = 0.1      # MARGEN DE ERRO PARA O AUDIO
-TOTAL_FRAMES = 9066   # WARNING: TOTAL DE FRAMES NO VIDEO (varia entre videos)
-AUDIO_LENGTH_X1 = 453 # WARNING: DURACAO (EM SEGUNDOS NA VELO x1) DO AUDIO
-FILE_PATH = 0         # INDICE DO PATH DOS ARUIVOS DE AUDIO
-CURR_SPEED = 1        # INDICE DA VELOCIDADE CORRESPONDENTE AO NUMERO DE FACES
-FRAME_DELAY = 2       # INDICE PARA O DELAY DE cv2.waitKey(x)
-SCAN_FACES = 3        # INDICE DO PERIODO PARA EXECUTAR CASCADE
+MAX_REWIND  = 300   # Max frames in rewind buffer
+MAX_OFFSET  = 0.1   # MARGEN DE ERRO PARA O AUDIO
+FILE_PATH   = 0     # INDICE DO PATH DOS ARUIVOS DE AUDIO
+CURR_SPEED  = 1     # INDICE DA VELOCIDADE CORRESPONDENTE AO NUMERO DE FACES
+FRAME_DELAY = 2     # INDICE PARA O DELAY DE cv2.waitKey(x)
+SCAN_FACES  = 3     # INDICE DO PERIODO PARA EXECUTAR CASCADE
 ### GLOBAlS #######################
 def glb():
     glb.led = 0              # VALOR DO LED
@@ -37,32 +35,21 @@ def glb():
     glb.old_faces_amount = 0 # NUMERO DE FACES ANTES DE ATUALIZAR
     glb.frame_count = 0      # FRAME ATUAL
     glb.base_time = 0        # TEMPO DE REFERECIA (necessario devido ao get_pos() da pygame)
-    glb.update_count = -1    # CONTA FRAMES ATE ATUAIZAR O CASCADE
-    glb.TOTAL_FRAMES = 0
+    glb.scan_count = -1    # CONTA FRAMES ATE ATUAIZAR O CASCADE
+    glb.TOTAL_FRAMES = 0     # TOTAL DE FRAMES NO ARQUIVO DE VÍDEO
+    glb.AUDIO_LENGTH_X1 = 0  # TEMPO DO AUDIO NA VELOCIDADE X1
 
-# def get_glb(x):
-#     return {'led':glb.led,
-#             'old_led':glb.old_led,
-#             'faces':glb.faces_amount,
-#             'old_faces':glb.old_faces_amount,
-#             'base_time':glb.basetime,
-#             'scan_count':glb.basetime,
-#             'total_frames':glb.total_frames
-#             }.get(x, missed('WRONG GLB VAR MAPPING!!')
-#
-# def set_glb(x, val)
-#     if (x =='led'): glb.led = val,
-#             'old_led':glb.old_led,
-#             'faces':glb.faces_amount,
-#             'old_faces':glb.old_faces_amount,
-#             'base_time':glb.basetime,
-#             'scan_count':glb.basetime,
-#             'total_frames':glb.total_frames
-#             }.get(x, missed('WRONG GLB VAR MAPPING!!')
+def get_glb(x):
+    return {'l':glb.led,
+            'ol':glb.old_led,
+            'fa':glb.faces_amount,
+            'of':glb.old_faces_amount,
+            'bt':glb.base_time,
+            'sc':glb.scan_count,
+            'tf':glb.TOTAL_FRAMES,
+            'al_x1':glb.AUDIO_LENGTH_X1
+            }.get(x, 0)
 
-def missed(str):
-    print(str)
-    return 0
 ################################################################################
 
 def find_faces(webcam):
@@ -105,7 +92,7 @@ def unrewind_video(rewind_buffer, index):
 
 # TODO
 ### CONDITION WICH DETERMINS IF THERE ARE PEOPLE ###
-def theres_people(): return (glb.faces_amount or glb.led)
+def theres_people(): return (get_glb('fa') or get_glb('l'))
 
 ### PLAY VIDEO FORWARD ###
 def play_video(rewind_buffer):
@@ -119,7 +106,7 @@ def play_video(rewind_buffer):
         update_playback_data(); # Updates faces, LED and audio speed
         display_frame(frame)    # Show frame
 
-        if (video == glb.TOTAL_FRAMES):
+        if (video == get_glb('tf')):
             return 'ending', 0
 
     return 'rewind', (len(rewind_buffer) - 1)
@@ -127,21 +114,21 @@ def play_video(rewind_buffer):
 ### UPDATE AUDIO SPEED ACCORDING TO THE LED AND FACES ###
 def update_playback_data():
     global SCAN_FACES, FILE_PATH
-    glb.update_count += 1
+    glb.scan_count += 1
 
-    if (glb.update_count % speed_data(glb.faces_amount)[SCAN_FACES]) == 0:
+    if (get_glb('sc') % speed_data(get_glb('fa'))[SCAN_FACES]) == 0:
         glb.led = led_status()
         glb.faces_amount = find_faces(webcam)
 
-        if not (glb.faces_amount == glb.old_faces_amount) or not (glb.led == glb.old_led):
-            if (glb.faces_amount): # Se ha mais que 0 faces
-                mixer.music.load(speed_data(glb.faces_amount)[FILE_PATH])
-            elif (glb.led): # Se ha 0 faces mas o led esta verde
+        if not (get_glb('fa') == get_glb('of')) or not (get_glb('l') == get_glb('ol')):
+            if (get_glb('fa')): # Se ha mais que 0 faces
+                mixer.music.load(speed_data(get_glb('fa'))[FILE_PATH])
+            elif (get_glb('l')): # Se ha 0 faces mas o led esta verde
                 mixer.music.load(speed_data(1)[FILE_PATH]) # Carrega audio de velo x1
             glb.base_time = get_audio_checkpoint() # Salva o tempo esperado do frame
-            mixer.music.play(0, glb.base_time)
-            glb.old_faces_amount = glb.faces_amount
-            glb.old_led = glb.led
+            mixer.music.play(0, get_glb('bt'))
+            glb.old_faces_amount = get_glb('fa')
+            glb.old_led = get_glb('l')
 
     return
 
@@ -183,10 +170,10 @@ def add_observers(frame):
     frame_copy = frame.copy()   # Cria deep copy do frame
 
     # Verifica numero de obseradores e a velicidade
-    if (glb.faces_amount):
-        observers = glb.faces_amount
-        speed = speed_data(glb.faces_amount)[CURR_SPEED]
-    elif (glb.led): # Caso nao haja faces mas o led esteja aceso
+    if (get_glb('fa')):
+        observers = get_glb('fa')
+        speed = speed_data(get_glb('fa'))[CURR_SPEED]
+    elif (get_glb('l')): # Caso nao haja faces mas o led esteja aceso
         observers = 1
         speed = 1 # se for apenas o led, velo e sempre 1
     else:
@@ -213,12 +200,12 @@ def led_status():
 def sync_video():
     global MAX_OFFSET, FRAME_DELAY, CURR_SPEED
 
-    delay = speed_data(glb.faces_amount)[FRAME_DELAY] # seta o delay como o padrao para a velocidade atual
+    delay = speed_data(get_glb('fa'))[FRAME_DELAY] # seta o delay como o padrao para a velocidade atual
     offset = get_audio_time() - get_audio_checkpoint() # Pega diferenca entre a posicao atual do audio, e a posicao
                                                        # esperada do audio para o frame atual (time - checkpoint)
     # mostra o delay (serve para regular DELAY e FACES, deixando o video mais fluido)
     if abs(offset) > MAX_OFFSET:
-        text = 'SYNC|x' + str(speed_data(glb.faces_amount)[CURR_SPEED])
+        text = 'SYNC|x' + str(speed_data(get_glb('fa'))[CURR_SPEED])
         print(text + '| frame:', glb.frame_count,'| offset:',offset)
 
     # Verifica se o atraso excede a margem de erro MAX_OFFSET
@@ -234,16 +221,16 @@ def sync_video():
 # Calcula a duracao do audio na velocidade atual e retorna a posicao esperada
 # do audio (segundos) e retorna.
 def get_audio_checkpoint():
-    global AUDIO_LENGTH_X1, CURR_SPEED
-    audio_length = AUDIO_LENGTH_X1/speed_data(glb.faces_amount)[CURR_SPEED]
-    return (glb.frame_count*audio_length/glb.TOTAL_FRAMES)
+    global CURR_SPEED
+    audio_length = get_glb('al_x1')/speed_data(get_glb('fa'))[CURR_SPEED]
+    return (glb.frame_count*audio_length/get_glb('tf'))
 
 ### GETS CURRENTE AUDIO TIME ###
 # recupera o tempo desde o comando mixer.music.play() e acresenta basetime
 # obtendo a posica atual do audio. Como os comandos mixer.music.play()
 # mixer.music.stop() resetam o tempo, usa o base-time para ajustar o valor
 def get_audio_time():
-    return (mixer.music.get_pos()/1000) + glb.base_time
+    return (mixer.music.get_pos()/1000) + get_glb('bt')
 
 ### ADDS FADE EFFECT FROM img1 TO img2 ###
 def fade_out (img1, img2, len=10): #pass images here to fade between
@@ -255,7 +242,7 @@ def fade_out (img1, img2, len=10): #pass images here to fade between
 
 ### GET LAST FRAME SHOWN IN GREYSCALE BUT WITH 3 CHANNELS ###
 def last_frame(rewind_buffer):
-    if (glb.frame_count == glb.TOTAL_FRAMES): # Se chegou ao fim do video
+    if (glb.frame_count == get_glb('tf')): # Se chegou ao fim do video
         frame = rewind_buffer[-1]         # Pega ultimo frame do video com cor
     else: # Se checgou a MAX_REWIND, pega o frame em preto e branco
         frame = cv2.cvtColor(rewind_buffer[0], cv2.COLOR_BGR2GRAY)
